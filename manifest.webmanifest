@@ -1,0 +1,16 @@
+{
+  "name": "프차야 — 프랜차이즈 상표 분쟁 카드게임",
+  "short_name": "프차야",
+  "description": "상표가 실제로 이동하며 뺏기는, 5라운드 기반 실시간 카드 전략 게임",
+  "lang": "ko",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1b1033",
+  "theme_color": "#1b1033",
+  "icons": [
+    { "src": "./assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "./assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

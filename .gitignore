@@ -1,0 +1,5 @@
+# OS / editor
+.DS_Store
+*.log
+# local screenshots / scratch
+.shot-*.png

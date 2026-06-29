@@ -1,0 +1,141 @@
+/* base.css — 레이아웃, 테마, 공통 컴포넌트 */
+:root {
+  --bg: #1b1033;
+  --bg2: #2a1850;
+  --panel: #2f2150;
+  --ink: #f4f0ff;
+  --muted: #b9aee0;
+  --a: #3d7bff;      /* 갑(A) 파랑 */
+  --b: #ff4d6d;      /* 을(B) 빨강 */
+  --center: #2ecc71; /* 중앙 초록 */
+  --gold: #ffcf4d;
+  --radius: 14px;
+  --shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  background: radial-gradient(1200px 800px at 50% -10%, var(--bg2), var(--bg));
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.screen { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.hidden { display: none !important; }
+
+/* 버튼 */
+.btn-primary, .btn-secondary {
+  font: inherit; font-weight: 700; cursor: pointer; border: none;
+  border-radius: var(--radius); padding: 12px 18px; color: #fff;
+  transition: transform .12s ease, filter .12s ease;
+}
+.btn-primary { background: linear-gradient(135deg, #7b4dff, #4d8bff); box-shadow: var(--shadow); }
+.btn-secondary { background: #3a2c5e; color: var(--ink); }
+.btn-primary:hover, .btn-secondary:hover { transform: translateY(-2px); filter: brightness(1.08); }
+.btn-primary:disabled { opacity: .5; cursor: default; transform: none; filter: none; }
+.btn-primary.big { font-size: 1.1rem; padding: 16px 22px; }
+
+.icon-btn {
+  width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer;
+  background: #3a2c5e; color: var(--ink); font-size: 1rem; font-weight: 700;
+}
+.icon-btn:hover { filter: brightness(1.2); }
+
+/* 시작 화면 */
+#screen-start { align-items: center; justify-content: center; padding: 20px; }
+.start-card {
+  background: var(--panel); border-radius: 22px; padding: 32px; max-width: 480px; width: 100%;
+  text-align: center; box-shadow: var(--shadow); border: 1px solid rgba(255,255,255,.08);
+}
+.title { font-size: 2.6rem; margin: 0; }
+.subtitle { color: var(--muted); margin: 6px 0 2px; }
+.tagline { color: var(--gold); font-size: .92rem; margin: 0 0 20px; }
+.mode-buttons { display: grid; gap: 12px; margin-bottom: 18px; }
+.toggles { display: grid; gap: 10px; text-align: left; margin: 0 auto 18px; max-width: 320px; }
+.toggle { background: #271a47; padding: 10px 14px; border-radius: 10px; cursor: pointer; font-size: .95rem; }
+.toggle input { margin-right: 8px; }
+.start-links { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+/* 배너 */
+.banner {
+  margin: 8px 12px; padding: 10px 14px; text-align: center; font-weight: 700;
+  background: rgba(255,255,255,.06); border-radius: 12px; min-height: 22px;
+}
+
+/* 레이어 */
+.layer { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+
+/* 토스트 */
+.toast {
+  position: relative; margin: 8px auto; max-width: 80%; width: fit-content;
+  background: rgba(20,12,40,.95); color: #fff; padding: 10px 16px; border-radius: 12px;
+  font-weight: 600; box-shadow: var(--shadow); opacity: 0; transform: translateY(-10px);
+  transition: opacity .25s ease, transform .25s ease; border: 1px solid rgba(255,255,255,.12);
+}
+#toast-layer { display: flex; flex-direction: column; align-items: center; padding-top: 70px; }
+.toast.show { opacity: 1; transform: translateY(0); }
+
+/* 모달 */
+.modal-layer {
+  position: fixed; inset: 0; background: rgba(8,4,20,.7); display: none;
+  align-items: center; justify-content: center; z-index: 80; padding: 20px;
+}
+.modal-layer.show { display: flex; }
+.modal {
+  background: var(--panel); border-radius: 18px; padding: 26px; max-width: 460px; width: 100%;
+  box-shadow: var(--shadow); border: 1px solid rgba(255,255,255,.1); text-align: center;
+}
+.modal h3 { margin-top: 0; }
+.modal .big-win { font-size: 1.6rem; color: var(--gold); font-weight: 800; }
+.modal-choices { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+.modal-choice { font: inherit; padding: 10px 14px; border-radius: 10px; border: none; cursor: pointer; background: #3a2c5e; color: var(--ink); font-weight: 700; }
+.modal-choice:hover { filter: brightness(1.2); }
+.help-body { text-align: left; font-size: .92rem; color: var(--ink); max-height: 50vh; overflow-y: auto; }
+.help-body ul { padding-left: 18px; }
+
+/* 가림막(패스앤플레이) */
+.cover {
+  position: fixed; inset: 0; background: linear-gradient(135deg, #241543, #3a1f5e);
+  display: none; align-items: center; justify-content: center; z-index: 90; text-align: center;
+}
+.cover.show { display: flex; }
+.cover-inner { padding: 30px; }
+.cover-emoji { font-size: 4rem; }
+.cover-inner h2 { margin: 8px 0; }
+.cover-inner p { color: var(--muted); margin-bottom: 20px; }
+
+/* 코치마크 */
+.coach-overlay { position: fixed; inset: 0; z-index: 95; background: rgba(5,2,15,.62); }
+.coach-hole {
+  position: fixed; border: 3px solid var(--gold); border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(5,2,15,.62); pointer-events: none;
+}
+.coach-tip {
+  position: fixed; max-width: 270px; background: var(--panel); padding: 14px;
+  border-radius: 12px; box-shadow: var(--shadow); border: 1px solid rgba(255,255,255,.12);
+}
+.coach-tip p { margin: 0 0 10px; font-size: .92rem; }
+.coach-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.coach-count { margin-right: auto; color: var(--muted); font-size: .82rem; }
+.coach-actions .btn-primary, .coach-actions .btn-secondary { padding: 7px 12px; font-size: .85rem; }
+
+/* 리플레이 컨트롤 바 */
+#replay-bar {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; z-index: 85;
+  background: rgba(20,12,40,.95); padding: 10px 16px; border-radius: 14px;
+  box-shadow: var(--shadow); border: 1px solid rgba(255,255,255,.12);
+}
+.rp-btn { font: inherit; font-weight: 700; border: none; cursor: pointer; background: #3a2c5e; color: var(--ink); border-radius: 8px; padding: 8px 12px; }
+.rp-btn:hover { filter: brightness(1.2); }
+.rp-exit { background: var(--b); }
+.rp-progress { color: var(--muted); min-width: 60px; text-align: center; }
+.rp-speed { color: var(--muted); font-size: .85rem; }
+.rp-speed select { font: inherit; margin-left: 4px; }
+
+@media (max-width: 640px) {
+  .legend { display: none; }
+  .title { font-size: 2.1rem; }
+}

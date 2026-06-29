@@ -1,0 +1,31 @@
+/* animations.css — 이동/충돌 연출 keyframes */
+
+.tm-moving { pointer-events: none; }
+
+/* 착지 충돌(뺏기) 흔들림 */
+.tm-shake { animation: tmShake .38s ease; }
+@keyframes tmShake {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  15% { transform: translateX(-7px) rotate(-3deg); }
+  30% { transform: translateX(7px) rotate(3deg); }
+  45% { transform: translateX(-5px) rotate(-2deg); }
+  60% { transform: translateX(5px) rotate(2deg); }
+  80% { transform: translateX(-2px); }
+}
+
+/* 영역 플래시 */
+@keyframes zoneFlash {
+  0% { background: rgba(255,207,77,0); }
+  40% { background: rgba(255,207,77,.28); }
+  100% { background: rgba(255,207,77,0); }
+}
+
+/* 선택 가능 상표 펄스 */
+@keyframes targetPulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(255,207,77,.6), var(--shadow); }
+  50% { box-shadow: 0 0 0 7px rgba(255,207,77,.25), var(--shadow); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tm-shake, .tm-token.targetable, .zone-flash { animation: none !important; }
+}

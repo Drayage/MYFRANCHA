@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1b1033" />
+  <title>프차야 — 프랜차이즈 상표 분쟁 카드게임</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./assets/icon-192.png" />
+  <link rel="apple-touch-icon" href="./assets/icon-192.png" />
+  <link rel="stylesheet" href="./styles/base.css" />
+  <link rel="stylesheet" href="./styles/board.css" />
+  <link rel="stylesheet" href="./styles/cards.css" />
+  <link rel="stylesheet" href="./styles/animations.css" />
+</head>
+<body>
+
+  <!-- ── 시작 화면 ── -->
+  <section id="screen-start" class="screen">
+    <div class="start-card">
+      <h1 class="title">🏷️ 프차야</h1>
+      <p class="subtitle">프랜차이즈 상표 분쟁 카드게임</p>
+      <p class="tagline">"상표가 실제로 이동하며 뺏기는, 5라운드 실시간 카드 전략"</p>
+
+      <div class="mode-buttons">
+        <button id="btn-ai" class="btn-primary big">🤖 AI 대전</button>
+        <button id="btn-local" class="btn-primary big">👥 로컬 패스앤플레이</button>
+      </div>
+
+      <div class="toggles">
+        <label class="toggle"><input type="checkbox" id="toggle-abilities" /> 🧬 상표 능력 모드 (확장)</label>
+        <label class="toggle"><input type="checkbox" id="toggle-theater" /> 🎭 연극모드 (갑·을 대사)</label>
+      </div>
+
+      <div class="start-links">
+        <button id="btn-help" class="btn-secondary">📖 게임 방법</button>
+        <button id="btn-replay-last" class="btn-secondary hidden">▶ 지난 게임 리플레이</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 게임 화면 ── -->
+  <section id="screen-game" class="screen hidden">
+    <header id="hud" class="hud">
+      <div class="hud-left">
+        <span id="hud-round" class="pill">라운드 1 / 5</span>
+        <span id="hud-set" class="pill">세트 1차</span>
+        <span id="hud-first" class="pill">선플레이어: 갑(A)</span>
+      </div>
+      <div class="hud-mid legend">
+        <span class="lg lg-center">🟢 중앙(공개)</span>
+        <span class="lg lg-a">🔵 갑(A)</span>
+        <span class="lg lg-b">🔴 을(B)</span>
+      </div>
+      <div class="hud-right">
+        <span id="hud-token-a" class="pill">갑(A) 토큰 0</span>
+        <span id="hud-token-b" class="pill">을(B) 토큰 0</span>
+        <button id="btn-help-game" class="icon-btn" title="규칙">?</button>
+        <button id="btn-coach" class="icon-btn" title="가이드 다시 보기">🧭</button>
+        <button id="btn-home" class="icon-btn" title="처음으로">🏠</button>
+      </div>
+    </header>
+
+    <div id="banner" class="banner">게임을 시작합니다…</div>
+
+    <main id="board" class="board">
+      <div class="zone zone-a-wrap">
+        <div class="zone-label">🔵 갑(A) <span id="hud-own-a" class="own">상표 0</span></div>
+        <div id="zone-A" class="zone-drop"></div>
+      </div>
+      <div class="zone zone-center-wrap">
+        <div class="zone-label">🟢 중앙 (공개)</div>
+        <div id="zone-center" class="zone-drop"></div>
+      </div>
+      <div class="zone zone-b-wrap">
+        <div class="zone-label">🔴 을(B) <span id="hud-own-b" class="own">상표 0</span></div>
+        <div id="zone-B" class="zone-drop"></div>
+      </div>
+    </main>
+
+    <section id="hand-area" class="hand-area">
+      <div class="hand-head">
+        <span id="hand-title" class="hand-title"></span>
+        <span id="peek" class="peek"></span>
+        <button id="submit-cards" class="btn-primary" disabled>제출</button>
+      </div>
+      <div id="hand" class="hand"></div>
+    </section>
+  </section>
+
+  <!-- ── 오버레이 레이어 ── -->
+  <div id="speech-layer" class="layer"></div>
+  <div id="toast-layer" class="layer"></div>
+  <div id="cover" class="cover"></div>
+  <div id="modal-layer" class="modal-layer"></div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
