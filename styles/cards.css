@@ -46,21 +46,24 @@
 
 #submit-cards { margin-left: auto; }
 
-/* ── 카드 공개 영역(세트 동시 공개 + 3D 플립) ── */
+/* ── 카드 공개 영역(세트 동시 공개 + 3D 플립) — 항상 한 줄 ── */
 .reveal-area {
-  display: none; gap: 14px; justify-content: center; flex-wrap: wrap;
-  padding: 8px 12px; margin: 0 12px;
+  display: none; gap: 8px; justify-content: center; align-items: flex-start;
+  flex-wrap: nowrap; padding: 6px 12px;
 }
-.reveal-area.show { display: flex; align-items: center; }
-.reveal-arrow { font-size: 1.4rem; font-weight: 900; color: var(--gold); }
+.reveal-area.show { display: flex; }
+.reveal-arrow { font-size: 1.3rem; font-weight: 900; color: var(--gold); align-self: center; flex: 0 0 auto; }
 
-.rcard { position: relative; width: 84px; }
+.rcard { position: relative; width: 84px; flex: 0 0 auto; }
 .rcard-seq {
   position: absolute; top: -8px; left: -6px; width: 22px; height: 22px; border-radius: 50%;
   background: var(--gold); color: #2a1850; font-weight: 900; font-size: .8rem; z-index: 4;
   display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow);
 }
-.rcard-who { font-size: .62rem; font-weight: 800; text-align: center; margin-bottom: 3px; }
+.rcard-who {
+  font-size: .6rem; font-weight: 800; text-align: center; margin-bottom: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .who-a { color: var(--a); }
 .who-b { color: var(--b); }
 .rcard-inner {
@@ -95,6 +98,14 @@
 }
 .rcard.nullified .rcard-stamp { transform: translate(-50%, 0) rotate(-14deg) scale(1); }
 .rcard.nullified .rcard-front { filter: grayscale(.7) brightness(.85); }
+
+/* 소송뭉개기: 이미 사용된 카드 표시(살짝 흐리게 + "사용" 도장) */
+.rcard.used .rcard-front { filter: grayscale(.35) brightness(.92); opacity: .9; }
+.rcard.used::after {
+  content: "사용"; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%) rotate(-8deg);
+  font-size: .58rem; font-weight: 900; color: #2a1850; background: var(--gold);
+  border-radius: 6px; padding: 1px 5px; z-index: 8; box-shadow: var(--shadow); pointer-events: none;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .rcard-inner { transition: none; }

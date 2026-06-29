@@ -13,11 +13,11 @@
 
 /* 보드 3영역 */
 .board {
-  flex: 1; display: grid; grid-template-columns: 1fr 1.2fr 1fr; gap: 12px;
-  padding: 12px; min-height: 0;
+  flex: 1; display: grid; grid-template-columns: 1fr 1.15fr 1fr; gap: 8px;
+  padding: 8px; min-height: 0;
 }
 .zone {
-  display: flex; flex-direction: column; border-radius: 16px; padding: 10px;
+  display: flex; flex-direction: column; border-radius: 16px; padding: 8px;
   background: rgba(255,255,255,.04); border: 2px solid transparent; min-height: 0;
 }
 .zone-a-wrap { border-color: rgba(61,123,255,.35); }
@@ -29,12 +29,20 @@
 .zone-drop {
   flex: 1; display: flex; flex-flow: column wrap; gap: 10px; align-items: center;
   justify-content: center; align-content: center; min-height: 100px;
-  transition: background .25s ease; border-radius: 12px; overflow: hidden;
+  transition: background .25s ease, box-shadow .25s ease; border-radius: 12px;
+  overflow: visible; /* 이동 중 상표가 영역 테두리에 잘리지 않게 */
 }
 .zone-flash { animation: zoneFlash .45s ease; }
 
+/* 손패 카드 선택 시 목표 "영역"을 은은하게 강조 */
+.zone-drop.zone-preview {
+  background: rgba(255,207,77,.10);
+  box-shadow: inset 0 0 0 2px rgba(255,207,77,.55);
+}
+
 /* 상표 토큰 */
 .tm-token {
+  position: relative;
   width: 122px; min-height: 94px; border-radius: 16px; cursor: default; flex: 0 0 auto;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: linear-gradient(160deg, #fff, #e9e3ff); color: #2a1850;
@@ -47,10 +55,16 @@
 .tm-emoji { font-size: 2.1rem; line-height: 1; }
 .tm-name { font-size: .88rem; margin-top: 5px; text-align: center; }
 
-/* 손패 카드 선택 시 보드에서 대상 상표 미리보기 강조(노란 링) */
-.tm-token.preview-target {
-  cursor: pointer;
-  box-shadow: 0 0 0 4px var(--gold), var(--shadow);
+/* 상표 능력 마커(능력 모드 ON) */
+.tm-ability {
+  position: absolute; top: -10px; right: -10px; width: 28px; height: 28px;
+  border-radius: 50%; background: #2a1850; color: #fff; font-size: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--gold); box-shadow: var(--shadow); z-index: 6;
+}
+.tm-ability.ability-active {
+  animation: abilityPulse .8s ease-in-out 2;
+  background: var(--gold); color: #2a1850;
 }
 
 /* 선택 가능 상표 하이라이트 */
@@ -62,11 +76,12 @@
 
 /* 말풍선(연극모드) */
 .speech {
-  position: fixed; transform: translate(-50%, -100%) scale(.8);
-  background: #fff; color: #2a1850; padding: 8px 12px; border-radius: 14px;
-  font-weight: 700; font-size: .9rem; max-width: 220px; text-align: center;
+  position: fixed; transform: translate(-50%, -100%) scale(.85);
+  background: #fff; color: #2a1850; padding: 9px 13px; border-radius: 14px;
+  font-weight: 700; font-size: .9rem; line-height: 1.3;
+  width: max-content; max-width: min(280px, 86vw); text-align: center;
   box-shadow: var(--shadow); opacity: 0; transition: opacity .25s ease, transform .25s ease;
-  pointer-events: none; z-index: 70;
+  pointer-events: none; z-index: 70; word-break: keep-all;
 }
 .speech::after {
   content: ""; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
@@ -82,8 +97,8 @@
 @media (max-width: 720px) {
   .hud { padding: 8px; gap: 6px; }
   .pill { font-size: .72rem; padding: 5px 8px; }
-  .board { gap: 6px; padding: 6px; }
-  .zone { padding: 6px; border-radius: 12px; }
+  .board { gap: 4px; padding: 4px; }
+  .zone { padding: 6px 5px; border-radius: 12px; }
   .zone-label { font-size: .8rem; margin-bottom: 4px; }
   .zone-drop { min-height: 90px; gap: 8px; }
   .tm-token { width: 92px; min-height: 74px; border-radius: 13px; padding: 6px; border-width: 3px; }

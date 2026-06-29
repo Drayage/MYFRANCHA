@@ -2,6 +2,7 @@
 import { TOTAL_ROUNDS, PLAYER_LABEL, OWNER } from './config.js';
 import { countOwned } from './state.js';
 import { CARD_BEHAVIOR } from './cards.js';
+import { ABILITY_INFO } from './abilities.js';
 
 const cardLabel = (card) => card.display || card.name;
 
@@ -15,9 +16,21 @@ export function buildBoard(state) {
     el.className = 'tm-token';
     el.dataset.tm = tm.id;
     el.dataset.owner = tm.owner;
-    el.innerHTML = `<span class="tm-emoji">${tm.emoji}</span><span class="tm-name">${tm.name}</span>`;
+    // 능력 모드 ON이면 상표 우상단에 능력 마커 표시
+    const marker = state.abilitiesEnabled && ABILITY_INFO[tm.ability]
+      ? `<span class="tm-ability" data-ability="${tm.ability}" title="${ABILITY_INFO[tm.ability].name}: ${ABILITY_INFO[tm.ability].desc}">${ABILITY_INFO[tm.ability].icon}</span>`
+      : '';
+    el.innerHTML = `${marker}<span class="tm-emoji">${tm.emoji}</span><span class="tm-name">${tm.name}</span>`;
     $(`zone-${tm.owner}`).appendChild(el);
   }
+}
+
+// 능력 발동 시 해당 상표 마커를 잠깐 강조
+export function flashAbility(abilityId) {
+  const m = document.querySelector(`.tm-ability[data-ability="${abilityId}"]`);
+  if (!m) return;
+  m.classList.add('ability-active');
+  setTimeout(() => m.classList.remove('ability-active'), 1600);
 }
 
 // 리플레이용: 모든 토큰을 중앙으로 즉시 복귀
@@ -75,20 +88,29 @@ export function selectCards(state, player, count, { peekInfo = null } = {}) {
     const hand = state.hands[player];
     const orderSel = [];                 // 선택 순서(uid 배열) = 제출/턴 순서
     const handEl = $('hand');
+    const isFirst = player === state.firstPlayer;     // 이번 세트 선플레이어 여부
+    // 선택 위치(슬롯/턴 k)의 전체 처리 순번: 슬롯마다 선=2k+1, 후=2k+2
+    const seqNo = (k) => 2 * k + (isFirst ? 1 : 2);
     $('hand-title').textContent =
-      `${PLAYER_LABEL[player]}(${player}) — 카드 ${count}장 선택${count > 1 ? ' (누른 순서 = 처리 순서)' : ''}`;
+      `${PLAYER_LABEL[player]}(${player}) — 카드 ${count}장 선택${count > 1 ? ' (누른 순서대로 처리)' : ''}`;
     $('peek').textContent = peekInfo ? `👀 상대 예상: ${peekInfo}` : '';
     handEl.innerHTML = '';
 
-    // 보드 대상 미리보기 강조
-    const clearPreview = () => document.querySelectorAll('.tm-token.preview-target')
-      .forEach((e) => e.classList.remove('preview-target'));
+    // 보드 대상 영역 은은하게 미리보기 (개별 상표가 아니라 영역 단위)
+    const clearPreview = () => document.querySelectorAll('.zone-drop.zone-preview')
+      .forEach((e) => e.classList.remove('zone-preview'));
+    const previewZones = (card) => {
+      const opp = player === 'A' ? 'B' : 'A';
+      switch (card.type) {
+        case 'apply': return ['center'];
+        case 'prove': return [opp];
+        case 'cancel': return [opp, 'center'];
+        default: return [];               // 소송뭉개기 등은 영역 강조 없음
+      }
+    };
     const showPreview = (card) => {
       clearPreview();
-      const b = CARD_BEHAVIOR[card.type];
-      if (b.needsTarget !== 'trademark') return;
-      b.validTargets(state, player).forEach((tm) =>
-        document.querySelector(`[data-tm="${tm.id}"]`)?.classList.add('preview-target'));
+      previewZones(card).forEach((z) => $(`zone-${z}`)?.classList.add('zone-preview'));
     };
 
     const renderBadges = () => {
@@ -96,7 +118,7 @@ export function selectCards(state, player, count, { peekInfo = null } = {}) {
         const pos = orderSel.indexOf(c.dataset.uid);
         c.classList.toggle('selected', pos >= 0);
         const badge = c.querySelector('.order-badge');
-        if (pos >= 0) { badge.textContent = count > 1 ? pos + 1 : '✓'; badge.style.display = 'flex'; }
+        if (pos >= 0) { badge.textContent = seqNo(pos); badge.style.display = 'flex'; }
         else badge.style.display = 'none';
       });
       const btn = $('submit-cards');
@@ -193,7 +215,7 @@ function makeRevealCard(player, slot, card, role, seqNo) {
   el.dataset.slot = slot;
   el.innerHTML = `
     <div class="rcard-seq">${seqNo}</div>
-    <div class="rcard-who ${player === 'A' ? 'who-a' : 'who-b'}">${PLAYER_LABEL[player]}(${player}) · 턴${slot + 1} · ${role}</div>
+    <div class="rcard-who ${player === 'A' ? 'who-a' : 'who-b'}">${PLAYER_LABEL[player]}·턴${slot + 1}·${role}</div>
     <div class="rcard-inner">
       <div class="rcard-face rcard-back">🏷️</div>
       <div class="rcard-face rcard-front">
@@ -217,6 +239,12 @@ export function flipRevealAll() {
 export function markRevealNullified(player, slot) {
   document.querySelector(`#reveal-area .rcard[data-player="${player}"][data-slot="${slot}"]`)
     ?.classList.add('nullified');
+}
+
+// 소송뭉개기처럼 이미 효과가 적용된 카드를 "사용됨"으로 표시
+export function markRevealUsed(player, slot) {
+  document.querySelector(`#reveal-area .rcard[data-player="${player}"][data-slot="${slot}"]`)
+    ?.classList.add('used');
 }
 
 export function highlightRevealCard(player, slot) {

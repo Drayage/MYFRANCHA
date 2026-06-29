@@ -40,7 +40,8 @@ export async function runGame(state, recorder) {
       if (!burgerKeepsToken(state)) {
         state.firstPlayer = opponentOf(state.firstPlayer);
       } else {
-        ui.showToast(`🍔 햄부기퀸 효과: ${PLAYER_LABEL[state.firstPlayer]}가 선플레이어 토큰 유지`);
+        ui.flashAbility('burger');
+        ui.showToast(`👑 햄부기퀸 효과: ${PLAYER_LABEL[state.firstPlayer]}가 선플레이어 토큰 유지`);
       }
       ui.updateHUD(state);
       await sleep(300);
@@ -68,6 +69,7 @@ async function collectSubmissions(state, size) {
   for (const player of order) {
     const peek = coffeePeek(state, player) && result[opponentOf(player)]
       ? describe(result[opponentOf(player)]) : null;
+    if (peek) ui.flashAbility('coffee');
     result[player] = await getSubmission(state, player, size, peek);
   }
   return result;
@@ -116,6 +118,7 @@ async function resolveSet(state, submissions, size, recorder) {
       if (slot && slot.card.type === 'smother') {
         const victim = slots[opponentOf(p)][i];
         if (victim) { victim.nullified = true; ui.markRevealNullified(opponentOf(p), i); }
+        ui.markRevealUsed(p, i);   // 소송뭉개기는 이 시점에 이미 사용됨
       }
     }
   }

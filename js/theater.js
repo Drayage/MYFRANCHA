@@ -64,12 +64,20 @@ function bubble(player, text, kind) {
   const b = document.createElement('div');
   b.className = `speech speech-${player} speech-${kind}`;
   b.textContent = `${PLAYER_LABEL[player]}: ${text}`;
-  const r = zone.getBoundingClientRect();
-  b.style.left = `${r.left + r.width / 2}px`;
-  b.style.top = `${r.top - 8}px`;
   layer.appendChild(b);
+
+  // 실제 크기를 측정해 뷰포트 안으로 위치 보정(가장자리에서 세로로 잘리지 않게)
+  const r = zone.getBoundingClientRect();
+  const bw = b.offsetWidth, bh = b.offsetHeight;
+  let left = r.left + r.width / 2;
+  left = Math.max(8 + bw / 2, Math.min(left, window.innerWidth - 8 - bw / 2));
+  let top = r.top - 10;                       // 영역 위쪽(말풍선은 -100%로 위로 뻗음)
+  if (top - bh < 8) top = r.top + r.height / 2 + bh; // 위 공간 부족하면 아래로
+  b.style.left = `${left}px`;
+  b.style.top = `${top}px`;
+
   setTimeout(() => b.classList.add('show'), 10);
-  setTimeout(() => { b.classList.remove('show'); setTimeout(() => b.remove(), 300); }, 1600);
+  setTimeout(() => { b.classList.remove('show'); setTimeout(() => b.remove(), 300); }, 1700);
 }
 
 // 카드 발동 시 호출. theater OFF면 no-op.

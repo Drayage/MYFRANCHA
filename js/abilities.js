@@ -4,15 +4,15 @@ import { countOwned } from './state.js';
 
 export const ABILITY_INFO = {
   coffee: {
-    name: '맹한커피',
+    name: '맹한커피', icon: '👀',
     desc: '매 라운드 첫 카드는 상대 카드를 확인한 뒤 제출할 수 있다.',
   },
   burger: {
-    name: '햄부기퀸',
+    name: '햄부기퀸', icon: '👑',
     desc: '선플레이어가 된 뒤에는 선플레이어 토큰을 넘기지 않는다.',
   },
   tteok: {
-    name: '염라떡볶이',
+    name: '염라떡볶이', icon: '🔀',
     desc: '테이블→손패 이동을 상대 손패 대상 이동으로 바꿀 수 있다.',
   },
 };
