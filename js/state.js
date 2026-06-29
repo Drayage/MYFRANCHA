@@ -1,19 +1,19 @@
 // state.js — 게임 상태 모델 + 순수 헬퍼
-import { TOTAL_ROUNDS, OWNER, TRADEMARKS, CARD_POOL, CARD_DEFS, HAND_SIZE } from './config.js';
+import { TOTAL_ROUNDS, OWNER, TRADEMARKS, FIXED_HAND, CARD_DEFS } from './config.js';
 
 let cardSeq = 0;
 function makeCard(typeId) {
   return { uid: `c${++cardSeq}`, type: typeId, ...CARD_DEFS[typeId] };
 }
 
-// 라운드 손패 한 벌 생성(랜덤)
-export function dealHand(n = HAND_SIZE) {
-  const hand = [];
-  for (let i = 0; i < n; i++) {
-    const t = CARD_POOL[Math.floor(Math.random() * CARD_POOL.length)];
-    hand.push(makeCard(t));
+// 매 라운드 고정 손패(출원2/증명1/취소1/뭉개1 = 5장)를 순서만 섞어 지급
+export function dealHand() {
+  const types = [...FIXED_HAND];
+  for (let i = types.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [types[i], types[j]] = [types[j], types[i]];
   }
-  return hand;
+  return types.map(makeCard);
 }
 
 // 새 게임 상태 생성

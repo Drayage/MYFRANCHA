@@ -100,15 +100,37 @@ function buildOrder(firstPlayer, size) {
 
 async function resolveSet(state, submissions, size, recorder) {
   const slots = { A: submissions.A, B: submissions.B };
-  const order = buildOrder(state.firstPlayer, size);
 
+  // 1) 이번 세트의 모든 카드를 뒷면으로 공개 영역에 표시 → 한꺼번에 플립 공개
+  const turns = [];
+  for (let i = 0; i < size; i++) turns.push({ A: slots.A[i], B: slots.B[i] });
+  ui.showRevealArea(turns, state.firstPlayer);
+  ui.setBanner(`라운드 ${state.round} · ${['1차','2차','3차'][state.setIndex]} — 카드 공개!`);
+  await ui.flipRevealAll();
+  await sleep(450);
+
+  // 2) 같은 턴 무효화 선계산: 한 슬롯에 소송뭉개기가 있으면 상대의 같은 슬롯 카드를 무효화
+  for (let i = 0; i < size; i++) {
+    for (const p of ['A', 'B']) {
+      const slot = slots[p][i];
+      if (slot && slot.card.type === 'smother') {
+        const victim = slots[opponentOf(p)][i];
+        if (victim) { victim.nullified = true; ui.markRevealNullified(opponentOf(p), i); }
+      }
+    }
+  }
+  await sleep(350);
+
+  // 3) 턴(슬롯) 순서대로, 각 턴은 선플레이어 먼저 순차 처리
+  const order = buildOrder(state.firstPlayer, size);
   for (const [player, idx] of order) {
     const slot = slots[player][idx];
     if (!slot) continue;
     slot.resolved = true;
-    const win = await resolveCard(state, player, slot, slots, recorder);
+    ui.highlightRevealCard(player, idx);
+    const win = await resolveCard(state, player, slot, recorder);
     ui.updateHUD(state);
-    if (win) { state.winner = win; return true; }
+    if (win) { state.winner = win; ui.clearRevealArea(); return true; }
 
     const tokGot = evaluateRoundToken(state);
     if (tokGot) {
@@ -118,10 +140,11 @@ async function resolveSet(state, submissions, size, recorder) {
       await sleep(400);
     }
   }
+  ui.clearRevealArea();
   return false;
 }
 
-async function resolveCard(state, player, slot, slots, recorder) {
+async function resolveCard(state, player, slot, recorder) {
   const card = slot.card;
   const opp = opponentOf(player);
 
@@ -131,23 +154,10 @@ async function resolveCard(state, player, slot, slots, recorder) {
     return null;
   }
 
-  // 소송뭉개기: 상표 이동 없음. 상대의 미처리 카드 1장 무효화.
+  // 소송뭉개기: 같은 턴 상대 카드 무효화는 이미 (2)에서 적용됨. 여기선 연출만.
   if (card.type === 'smother') {
-    const pending = slots[opp].filter((s) => !s.resolved && !s.nullified);
-    let pickIdx;
-    if (isHuman(state, player)) {
-      pickIdx = await ui.selectSmotherTarget(pending, `${PLAYER_LABEL[player]}(${player})`);
-    } else {
-      pickIdx = ai.chooseSmotherTarget(state, player, pending);
-    }
-    if (pickIdx == null || !pending[pickIdx]) {
-      ui.showToast(`${PLAYER_LABEL[player]}: 소송뭉개기 — 무효화할 카드가 없습니다.`);
-      await sleep(500);
-      return null;
-    }
-    pending[pickIdx].nullified = true;
     recorder.add({ kind: 'nullify', round: state.round, actor: player, victim: opp });
-    ui.showToast(`🗂️ ${PLAYER_LABEL[player]}가 소송뭉개기로 ${PLAYER_LABEL[opp]}의 카드를 무효화!`, 2000);
+    ui.showToast(`🗂️ ${PLAYER_LABEL[player]}가 소송뭉개기로 ${PLAYER_LABEL[opp]}의 같은 턴 카드를 무효화!`, 2000);
     await theater.say(state, { cardType: 'smother', actor: player, victim: opp });
     await sleep(300);
     return null;

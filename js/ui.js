@@ -136,21 +136,69 @@ export function selectTrademark(validTms, promptText) {
   });
 }
 
-// ── 소송뭉개기 대상(상대 미처리 카드) 선택 ──
-export function selectSmotherTarget(pendingCards, actorLabel) {
-  return new Promise((resolve) => {
-    if (!pendingCards.length) { resolve(null); return; }
-    const html = pendingCards
-      .map((p, i) => `<button class="modal-choice" data-i="${i}">상대 카드 #${i + 1}</button>`)
-      .join('');
-    const buttons = `<button class="modal-choice" data-i="-1">사용 안 함</button>`;
-    openModal(`<h3>🗂️ 소송뭉개기</h3><p>${actorLabel}: 무효화할 상대 카드를 고르세요. (내용은 비공개)</p>
-      <div class="modal-choices">${html}${buttons}</div>`, (root) => {
-      root.querySelectorAll('.modal-choice').forEach((b) => {
-        b.onclick = () => { closeModal(); const i = parseInt(b.dataset.i); resolve(i < 0 ? null : i); };
-      });
-    });
+// ── 카드 공개 영역(세트 단위 동시 공개) ──
+const reduced = () =>
+  window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// turns: [{A: slot, B: slot}, ...] (slot = {card, ...}). firstPlayer 표시.
+export function showRevealArea(turns, firstPlayer) {
+  const area = $('reveal-area');
+  area.innerHTML = '';
+  area.classList.add('show');
+  turns.forEach((pair, i) => {
+    const row = document.createElement('div');
+    row.className = 'reveal-turn';
+    row.innerHTML = `<span class="rt-label">턴 ${i + 1}</span>`;
+    for (const p of ['A', 'B']) {
+      const order = p === firstPlayer ? '선' : '후';
+      row.appendChild(makeRevealCard(p, i, pair[p]?.card, order));
+    }
+    area.appendChild(row);
   });
+}
+
+function makeRevealCard(player, slot, card, order) {
+  const el = document.createElement('div');
+  el.className = 'rcard';
+  el.dataset.player = player;
+  el.dataset.slot = slot;
+  el.innerHTML = `
+    <div class="rcard-who ${player === 'A' ? 'who-a' : 'who-b'}">${PLAYER_LABEL[player]}(${player}) · ${order}</div>
+    <div class="rcard-inner">
+      <div class="rcard-face rcard-back">🏷️</div>
+      <div class="rcard-face rcard-front">
+        <span class="rcard-emoji">${card ? card.emoji : ''}</span>
+        <span class="rcard-name">${card ? card.name : ''}</span>
+      </div>
+    </div>
+    <div class="rcard-stamp">무효</div>`;
+  return el;
+}
+
+// 모든 공개 카드를 한꺼번에 플립
+export function flipRevealAll() {
+  return new Promise((resolve) => {
+    const cards = document.querySelectorAll('#reveal-area .rcard');
+    cards.forEach((c) => c.classList.add('flipped'));
+    setTimeout(resolve, reduced() ? 0 : 600);
+  });
+}
+
+export function markRevealNullified(player, slot) {
+  document.querySelector(`#reveal-area .rcard[data-player="${player}"][data-slot="${slot}"]`)
+    ?.classList.add('nullified');
+}
+
+export function highlightRevealCard(player, slot) {
+  document.querySelectorAll('#reveal-area .rcard.active').forEach((c) => c.classList.remove('active'));
+  document.querySelector(`#reveal-area .rcard[data-player="${player}"][data-slot="${slot}"]`)
+    ?.classList.add('active');
+}
+
+export function clearRevealArea() {
+  const area = $('reveal-area');
+  area.classList.remove('show');
+  area.innerHTML = '';
 }
 
 // ── 범용 모달 ──

@@ -27,25 +27,25 @@
 .zone-label .own { color: var(--gold); font-size: .82rem; margin-left: 6px; }
 
 .zone-drop {
-  flex: 1; display: flex; flex-direction: column; gap: 10px; align-items: center;
-  justify-content: center; min-height: 120px; transition: background .25s ease;
-  border-radius: 12px;
+  flex: 1; display: flex; flex-flow: column wrap; gap: 10px; align-items: center;
+  justify-content: center; align-content: center; min-height: 100px;
+  transition: background .25s ease; border-radius: 12px; overflow: hidden;
 }
 .zone-flash { animation: zoneFlash .45s ease; }
 
 /* 상표 토큰 */
 .tm-token {
-  width: 120px; min-height: 84px; border-radius: 16px; cursor: default;
+  width: 96px; min-height: 72px; border-radius: 14px; cursor: default; flex: 0 0 auto;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: linear-gradient(160deg, #fff, #e9e3ff); color: #2a1850;
   box-shadow: var(--shadow); border: 3px solid #fff; user-select: none;
-  font-weight: 800; will-change: transform;
+  font-weight: 800; will-change: transform; padding: 6px;
 }
 .tm-token[data-owner="A"] { border-color: var(--a); }
 .tm-token[data-owner="B"] { border-color: var(--b); }
 .tm-token[data-owner="center"] { border-color: var(--center); }
-.tm-emoji { font-size: 2rem; line-height: 1; }
-.tm-name { font-size: .9rem; margin-top: 4px; }
+.tm-emoji { font-size: 1.6rem; line-height: 1; }
+.tm-name { font-size: .78rem; margin-top: 3px; text-align: center; }
 
 /* 선택 가능 상표 하이라이트 */
 .tm-token.targetable {
@@ -71,3 +71,21 @@
 .speech-actor::after { border-top-color: #fff7e0; }
 .speech-victim { background: #ffe6ea; }
 .speech-victim::after { border-top-color: #ffe6ea; }
+
+/* 모바일: 상표가 영역 밖으로 튀어나오지 않게 축소·정리 */
+@media (max-width: 720px) {
+  .hud { padding: 8px; gap: 6px; }
+  .pill { font-size: .72rem; padding: 5px 8px; }
+  .board { gap: 6px; padding: 6px; }
+  .zone { padding: 6px; border-radius: 12px; }
+  .zone-label { font-size: .8rem; margin-bottom: 4px; }
+  .zone-drop { min-height: 80px; gap: 6px; }
+  .tm-token { width: 68px; min-height: 56px; border-radius: 11px; padding: 4px; border-width: 2px; }
+  .tm-emoji { font-size: 1.2rem; }
+  .tm-name { font-size: .6rem; margin-top: 2px; }
+}
+@media (max-width: 420px) {
+  .tm-token { width: 58px; min-height: 50px; }
+  .tm-emoji { font-size: 1.05rem; }
+  .tm-name { font-size: .54rem; }
+}

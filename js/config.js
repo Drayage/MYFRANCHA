@@ -7,9 +7,6 @@ export const TOTAL_ROUNDS = 5;
 // 각 세트가 끝날 때마다 선플레이어 토큰 교대(라운드당 3번).
 export const SET_SIZES = [1, 2, 2];
 
-// 라운드 시작 시 지급하는 손패 수(약간의 선택지를 위해 필요량 5장보다 많게).
-export const HAND_SIZE = 7;
-
 // 영역(owner) 식별자
 export const OWNER = { CENTER: 'center', A: 'A', B: 'B' };
 
@@ -47,10 +44,6 @@ export const CARD_DEFS = {
   },
 };
 
-// 라운드 손패에 섞을 카드 풀(가중치). 출원/증명을 더 자주 등장.
-export const CARD_POOL = [
-  'apply', 'apply', 'apply',
-  'prove', 'prove',
-  'cancel', 'cancel',
-  'smother',
-];
+// 매 라운드 고정 손패: 출원 2장 / 사실관계증명 1 / 불사용취소심판 1 / 소송뭉개기 1 = 5장.
+// 라운드당 1+2+2=5장을 모두 소진한다.
+export const FIXED_HAND = ['apply', 'apply', 'prove', 'cancel', 'smother'];

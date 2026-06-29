@@ -38,22 +38,6 @@ export function chooseSubmission(state, player, count) {
 // 카드 해결 시 상표 대상 선택
 export function chooseTarget(state, player, card, validTargets) {
   if (validTargets.length === 0) return null;
-  const opp = opponentOf(player);
-  if (card.type === 'prove' || card.type === 'cancel') {
-    // 상대가 2개 보유 중이면 그 중 하나를 우선(라운드 토큰 저지)
-    return validTargets[0];
-  }
-  // 출원: 능력 보유 가치가 큰 상표 우선(임의로 첫 번째)
+  // prove/cancel: 상대 상표 중 첫 번째, apply: 중앙 상표 중 첫 번째
   return validTargets[0];
-}
-
-// 소송뭉개기 대상: 상대 미처리 카드 중 가장 위협적인 것의 인덱스
-export function chooseSmotherTarget(state, player, pendingCards) {
-  if (!pendingCards.length) return null;
-  let best = 0, bestScore = -Infinity;
-  pendingCards.forEach((pc, i) => {
-    const s = scoreCard(state, opponentOf(player), pc.card);
-    if (s > bestScore) { bestScore = s; best = i; }
-  });
-  return best;
 }

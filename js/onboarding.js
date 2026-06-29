@@ -1,7 +1,5 @@
-// onboarding.js — 첫 실행 코치마크 + 규칙 도움말
+// onboarding.js — 튜토리얼 코치마크 + 규칙 도움말
 import { openModal, closeModal } from './ui.js';
-
-const SEEN_KEY = 'francha.coachSeen';
 
 // 규칙 요약 도움말(언제든 ? 버튼으로)
 export function showHelp() {
@@ -38,8 +36,8 @@ const STEPS = [
   { sel: '#hud',         text: '라운드/세트, 선플레이어, 라운드 토큰을 여기서 확인하세요. ? 버튼으로 규칙을 다시 볼 수 있어요.' },
 ];
 
-export function maybeShowCoachmarks(force = false) {
-  if (!force && localStorage.getItem(SEEN_KEY)) return Promise.resolve();
+// 튜토리얼 토글로 제어되므로 호출되면 항상 코치마크를 보여준다.
+export function showCoachmarks() {
   return runCoach(0);
 }
 
@@ -47,19 +45,17 @@ function runCoach(i) {
   return new Promise((resolve) => {
     const step = (idx) => {
       cleanup();
-      if (idx >= STEPS.length) {
-        try { localStorage.setItem(SEEN_KEY, '1'); } catch (e) {}
-        resolve();
-        return;
-      }
+      if (idx >= STEPS.length) { resolve(); return; }
+
       const target = document.querySelector(STEPS[idx].sel);
+      const r = target ? target.getBoundingClientRect()
+        : { left: 20, top: 20, width: 100, height: 50, bottom: 70 };
       const overlay = document.createElement('div');
       overlay.id = 'coach-overlay';
       overlay.className = 'coach-overlay';
-      const r = target ? target.getBoundingClientRect() : { left: 20, top: 20, width: 100, height: 50, bottom: 70 };
       overlay.innerHTML = `
         <div class="coach-hole" style="left:${r.left - 6}px;top:${r.top - 6}px;width:${r.width + 12}px;height:${r.height + 12}px"></div>
-        <div class="coach-tip" style="left:${Math.min(r.left, window.innerWidth - 280)}px;top:${r.bottom + 12}px">
+        <div class="coach-tip">
           <p>${STEPS[idx].text}</p>
           <div class="coach-actions">
             <span class="coach-count">${idx + 1} / ${STEPS.length}</span>
@@ -68,11 +64,23 @@ function runCoach(i) {
           </div>
         </div>`;
       document.body.appendChild(overlay);
+
+      // tip을 DOM에 넣은 뒤 실제 크기를 측정해 뷰포트 안으로 위치 보정.
+      const tip = overlay.querySelector('.coach-tip');
+      const tr = tip.getBoundingClientRect();
+      const margin = 12;
+      let top = r.bottom + margin;                       // 기본: 대상 아래
+      if (top + tr.height > window.innerHeight - 8) {     // 아래 공간 부족 → 대상 위로
+        top = r.top - tr.height - margin;
+      }
+      top = Math.max(8, Math.min(top, window.innerHeight - tr.height - 8));
+      let left = Math.min(r.left, window.innerWidth - tr.width - 8);
+      left = Math.max(8, left);
+      tip.style.left = `${left}px`;
+      tip.style.top = `${top}px`;
+
       overlay.querySelector('#coach-next').onclick = () => step(idx + 1);
-      overlay.querySelector('#coach-skip').onclick = () => {
-        try { localStorage.setItem(SEEN_KEY, '1'); } catch (e) {}
-        cleanup(); resolve();
-      };
+      overlay.querySelector('#coach-skip').onclick = () => { cleanup(); resolve(); };
     };
     const cleanup = () => document.getElementById('coach-overlay')?.remove();
     step(i);

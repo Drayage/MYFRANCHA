@@ -2,7 +2,7 @@
 import { createState } from './state.js';
 import { runGame } from './engine.js';
 import * as ui from './ui.js';
-import { showHelp, maybeShowCoachmarks } from './onboarding.js';
+import { showHelp, showCoachmarks } from './onboarding.js';
 import { createRecorder, saveReplay, loadReplay, hasReplay, play as playReplay } from './replay.js';
 
 const $ = (id) => document.getElementById(id);
@@ -21,7 +21,7 @@ async function startGame(mode) {
   show('game');
   ui.buildBoard(state);
   ui.updateHUD(state);
-  await maybeShowCoachmarks();
+  if ($('toggle-tutorial').checked) await showCoachmarks();
 
   const recorder = createRecorder({ mode, ...opts });
   const result = await runGame(state, recorder);
@@ -65,7 +65,7 @@ function init() {
   $('btn-local').onclick = () => startGame('local');
   $('btn-help').onclick = showHelp;
   $('btn-help-game').onclick = showHelp;
-  $('btn-coach').onclick = () => maybeShowCoachmarks(true);
+  $('btn-coach').onclick = () => showCoachmarks();
   $('btn-home').onclick = goHome;
   $('btn-replay-last').onclick = () => runReplay(loadReplay());
   refreshReplayButton();
