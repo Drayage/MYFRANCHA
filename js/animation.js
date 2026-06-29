@@ -42,7 +42,7 @@ export function move(tmId, toOwner, { collision = false } = {}) {
       return;
     }
 
-    const animDur = dur(620);
+    const animDur = dur(950);
     const arcHeight = Math.min(120, Math.max(40, Math.abs(dx) * 0.35));
     el.style.zIndex = '50';
     el.classList.add('tm-moving');

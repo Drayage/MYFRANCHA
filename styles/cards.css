@@ -9,15 +9,21 @@
 .hand-title { font-weight: 800; }
 .peek { color: var(--gold); font-size: .85rem; flex: 1; }
 
-/* 손패 5장이 가로 스크롤 없이 한 화면에 들어오게 */
-.hand { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+/* 손패 5장이 항상 한 줄 (가로 스크롤 없이 축소) */
+.hand { display: flex; flex-wrap: nowrap; gap: 8px; justify-content: center; }
 
 .card {
-  position: relative; flex: 0 1 110px; width: 110px; min-height: 96px;
+  position: relative; flex: 1 1 0; min-width: 0; max-width: 132px; min-height: 96px;
   border-radius: 14px; border: 2px solid rgba(255,255,255,.18); cursor: pointer;
   background: linear-gradient(160deg, #34255c, #281a47); color: var(--ink);
   display: flex; flex-direction: column; align-items: center; padding: 10px 8px; gap: 3px;
   font: inherit; transition: transform .12s ease, border-color .12s ease, box-shadow .12s ease;
+}
+/* 선택 순서 배지 */
+.order-badge {
+  position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--gold); color: #2a1850; font-weight: 900; font-size: .85rem;
+  display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); z-index: 5;
 }
 .card:hover { transform: translateY(-6px); box-shadow: var(--shadow); }
 .card.selected { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold), var(--shadow); transform: translateY(-6px); }
@@ -45,21 +51,25 @@
   display: none; gap: 14px; justify-content: center; flex-wrap: wrap;
   padding: 8px 12px; margin: 0 12px;
 }
-.reveal-area.show { display: flex; }
-.reveal-turn {
-  display: flex; align-items: center; gap: 8px; padding: 6px 10px;
-  background: rgba(255,255,255,.05); border-radius: 12px;
-}
-.rt-label { font-size: .78rem; font-weight: 800; color: var(--muted); }
+.reveal-area.show { display: flex; align-items: center; }
+.reveal-arrow { font-size: 1.4rem; font-weight: 900; color: var(--gold); }
 
 .rcard { position: relative; width: 84px; }
-.rcard-who { font-size: .66rem; font-weight: 800; text-align: center; margin-bottom: 3px; }
+.rcard-seq {
+  position: absolute; top: -8px; left: -6px; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--gold); color: #2a1850; font-weight: 900; font-size: .8rem; z-index: 4;
+  display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow);
+}
+.rcard-who { font-size: .62rem; font-weight: 800; text-align: center; margin-bottom: 3px; }
 .who-a { color: var(--a); }
 .who-b { color: var(--b); }
 .rcard-inner {
   position: relative; width: 84px; height: 72px; transform-style: preserve-3d;
-  transition: transform .5s ease;
+  transition: transform .7s ease;
 }
+/* 낸 카드 테두리색: 내건 내 색(갑=파랑), 적껀 적의 색(을=빨강) */
+.rcard[data-player="A"] .rcard-face { border-color: var(--a); }
+.rcard[data-player="B"] .rcard-face { border-color: var(--b); }
 .rcard.flipped .rcard-inner { transform: rotateY(180deg); }
 .rcard-face {
   position: absolute; inset: 0; backface-visibility: hidden; border-radius: 12px;
@@ -90,12 +100,15 @@
   .rcard-inner { transition: none; }
 }
 @media (max-width: 720px) {
-  .card { flex-basis: 86px; width: 86px; min-height: 84px; padding: 8px 6px; }
+  .hand { gap: 5px; }
+  .card { min-height: 86px; padding: 8px 5px; }
   .card-emoji { font-size: 1.3rem; }
-  .card-name { font-size: .76rem; }
-  .card-short { font-size: .58rem; }
-  .reveal-turn { padding: 4px 6px; gap: 5px; }
-  .rcard, .rcard-inner { width: 60px; }
-  .rcard-inner { height: 54px; }
+  .card-name { font-size: .72rem; }
+  .card-short { font-size: .56rem; }
+  .order-badge { width: 20px; height: 20px; font-size: .72rem; top: -6px; right: -6px; }
+  .reveal-arrow { font-size: 1.1rem; }
+  .rcard, .rcard-inner { width: 62px; }
+  .rcard-inner { height: 56px; }
   .rcard-emoji { font-size: 1.1rem; }
+  .rcard-name { font-size: .56rem; }
 }

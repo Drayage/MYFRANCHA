@@ -1,6 +1,9 @@
 // ui.js — 렌더링 및 플레이어 상호작용
 import { TOTAL_ROUNDS, PLAYER_LABEL, OWNER } from './config.js';
 import { countOwned } from './state.js';
+import { CARD_BEHAVIOR } from './cards.js';
+
+const cardLabel = (card) => card.display || card.name;
 
 const $ = (id) => document.getElementById(id);
 
@@ -67,43 +70,68 @@ export function showCover(player) {
 
 // ── 손패에서 카드 N장 선택 ──
 // peekInfo: 맹한커피로 미리 본 상대 카드 정보(문자열)
-export function selectCards(state, player, count, { peekInfo = null, autoLabel } = {}) {
+export function selectCards(state, player, count, { peekInfo = null } = {}) {
   return new Promise((resolve) => {
     const hand = state.hands[player];
-    const selected = new Set();
+    const orderSel = [];                 // 선택 순서(uid 배열) = 제출/턴 순서
     const handEl = $('hand');
     $('hand-title').textContent =
-      `${PLAYER_LABEL[player]}(${player}) — 카드 ${count}장 선택`;
+      `${PLAYER_LABEL[player]}(${player}) — 카드 ${count}장 선택${count > 1 ? ' (누른 순서 = 처리 순서)' : ''}`;
     $('peek').textContent = peekInfo ? `👀 상대 예상: ${peekInfo}` : '';
     handEl.innerHTML = '';
+
+    // 보드 대상 미리보기 강조
+    const clearPreview = () => document.querySelectorAll('.tm-token.preview-target')
+      .forEach((e) => e.classList.remove('preview-target'));
+    const showPreview = (card) => {
+      clearPreview();
+      const b = CARD_BEHAVIOR[card.type];
+      if (b.needsTarget !== 'trademark') return;
+      b.validTargets(state, player).forEach((tm) =>
+        document.querySelector(`[data-tm="${tm.id}"]`)?.classList.add('preview-target'));
+    };
+
+    const renderBadges = () => {
+      handEl.querySelectorAll('.card').forEach((c) => {
+        const pos = orderSel.indexOf(c.dataset.uid);
+        c.classList.toggle('selected', pos >= 0);
+        const badge = c.querySelector('.order-badge');
+        if (pos >= 0) { badge.textContent = count > 1 ? pos + 1 : '✓'; badge.style.display = 'flex'; }
+        else badge.style.display = 'none';
+      });
+      const btn = $('submit-cards');
+      btn.disabled = orderSel.length !== count;
+      btn.textContent = orderSel.length === count ? '제출' : `${orderSel.length}/${count} 선택`;
+    };
 
     hand.forEach((card) => {
       const c = document.createElement('button');
       c.className = 'card';
       c.dataset.uid = card.uid;
       c.innerHTML = `
+        <span class="order-badge" style="display:none"></span>
         <span class="card-emoji">${card.emoji}</span>
-        <span class="card-name">${card.name}</span>
+        <span class="card-name">${cardLabel(card)}</span>
         <span class="card-short">${card.short}</span>
         <span class="card-tip">${card.desc}</span>`;
+      c.onmouseenter = () => showPreview(card);
+      c.onmouseleave = clearPreview;
       c.onclick = () => {
-        if (selected.has(card.uid)) {
-          selected.delete(card.uid); c.classList.remove('selected');
-        } else if (selected.size < count) {
-          selected.add(card.uid); c.classList.add('selected');
-        }
-        $('submit-cards').disabled = selected.size !== count;
-        $('submit-cards').textContent =
-          selected.size === count ? '제출' : `${selected.size}/${count} 선택`;
+        const i = orderSel.indexOf(card.uid);
+        if (i >= 0) orderSel.splice(i, 1);
+        else if (orderSel.length < count) orderSel.push(card.uid);
+        renderBadges();
+        showPreview(card);
       };
       handEl.appendChild(c);
     });
+    renderBadges();
 
     const btn = $('submit-cards');
-    btn.disabled = true;
-    btn.textContent = `0/${count} 선택`;
     btn.onclick = () => {
-      const chosen = hand.filter((c) => selected.has(c.uid));
+      // 선택 순서대로 반환 → 제출 슬롯(턴) 순서가 됨
+      const chosen = orderSel.map((uid) => hand.find((c) => c.uid === uid));
+      clearPreview();
       handEl.innerHTML = '';
       $('hand-title').textContent = '';
       $('peek').textContent = '';
@@ -140,35 +168,37 @@ export function selectTrademark(validTms, promptText) {
 const reduced = () =>
   window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// turns: [{A: slot, B: slot}, ...] (slot = {card, ...}). firstPlayer 표시.
-export function showRevealArea(turns, firstPlayer) {
+// slots: {A:[slot..], B:[slot..]}, order: [[player, slotIdx], ...] (처리 순서), firstPlayer.
+// 처리 순서대로 가로 시퀀스 + 화살표 + 순번 배지로 공개 순서를 보여준다.
+export function showRevealArea(slots, order, firstPlayer) {
   const area = $('reveal-area');
   area.innerHTML = '';
   area.classList.add('show');
-  turns.forEach((pair, i) => {
-    const row = document.createElement('div');
-    row.className = 'reveal-turn';
-    row.innerHTML = `<span class="rt-label">턴 ${i + 1}</span>`;
-    for (const p of ['A', 'B']) {
-      const order = p === firstPlayer ? '선' : '후';
-      row.appendChild(makeRevealCard(p, i, pair[p]?.card, order));
+  order.forEach(([player, slotIdx], seq) => {
+    if (seq > 0) {
+      const arrow = document.createElement('div');
+      arrow.className = 'reveal-arrow';
+      arrow.textContent = '→';
+      area.appendChild(arrow);
     }
-    area.appendChild(row);
+    const role = player === firstPlayer ? '선' : '후';
+    area.appendChild(makeRevealCard(player, slotIdx, slots[player][slotIdx]?.card, role, seq + 1));
   });
 }
 
-function makeRevealCard(player, slot, card, order) {
+function makeRevealCard(player, slot, card, role, seqNo) {
   const el = document.createElement('div');
   el.className = 'rcard';
   el.dataset.player = player;
   el.dataset.slot = slot;
   el.innerHTML = `
-    <div class="rcard-who ${player === 'A' ? 'who-a' : 'who-b'}">${PLAYER_LABEL[player]}(${player}) · ${order}</div>
+    <div class="rcard-seq">${seqNo}</div>
+    <div class="rcard-who ${player === 'A' ? 'who-a' : 'who-b'}">${PLAYER_LABEL[player]}(${player}) · 턴${slot + 1} · ${role}</div>
     <div class="rcard-inner">
       <div class="rcard-face rcard-back">🏷️</div>
       <div class="rcard-face rcard-front">
         <span class="rcard-emoji">${card ? card.emoji : ''}</span>
-        <span class="rcard-name">${card ? card.name : ''}</span>
+        <span class="rcard-name">${card ? cardLabel(card) : ''}</span>
       </div>
     </div>
     <div class="rcard-stamp">무효</div>`;
@@ -180,7 +210,7 @@ export function flipRevealAll() {
   return new Promise((resolve) => {
     const cards = document.querySelectorAll('#reveal-area .rcard');
     cards.forEach((c) => c.classList.add('flipped'));
-    setTimeout(resolve, reduced() ? 0 : 600);
+    setTimeout(resolve, reduced() ? 0 : 780);
   });
 }
 

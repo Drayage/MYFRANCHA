@@ -101,13 +101,13 @@ function buildOrder(firstPlayer, size) {
 async function resolveSet(state, submissions, size, recorder) {
   const slots = { A: submissions.A, B: submissions.B };
 
-  // 1) 이번 세트의 모든 카드를 뒷면으로 공개 영역에 표시 → 한꺼번에 플립 공개
-  const turns = [];
-  for (let i = 0; i < size; i++) turns.push({ A: slots.A[i], B: slots.B[i] });
-  ui.showRevealArea(turns, state.firstPlayer);
+  // 1) 처리 순서대로 카드를 뒷면으로 공개 영역에 깔고(화살표/순번 표시) → 잠깐 뒤 한꺼번에 플립
+  const order = buildOrder(state.firstPlayer, size);
+  ui.showRevealArea(slots, order, state.firstPlayer);
   ui.setBanner(`라운드 ${state.round} · ${['1차','2차','3차'][state.setIndex]} — 카드 공개!`);
-  await ui.flipRevealAll();
-  await sleep(450);
+  await sleep(650);              // 뒷면을 잠깐 보여준 뒤
+  await ui.flipRevealAll();      // 동시에 뒤집기
+  await sleep(550);
 
   // 2) 같은 턴 무효화 선계산: 한 슬롯에 소송뭉개기가 있으면 상대의 같은 슬롯 카드를 무효화
   for (let i = 0; i < size; i++) {
@@ -119,10 +119,9 @@ async function resolveSet(state, submissions, size, recorder) {
       }
     }
   }
-  await sleep(350);
+  await sleep(450);
 
   // 3) 턴(슬롯) 순서대로, 각 턴은 선플레이어 먼저 순차 처리
-  const order = buildOrder(state.firstPlayer, size);
   for (const [player, idx] of order) {
     const slot = slots[player][idx];
     if (!slot) continue;
@@ -197,7 +196,7 @@ async function resolveCard(state, player, slot, recorder) {
 
   const destLabel = toOwner === OWNER.CENTER ? '중앙' : `${PLAYER_LABEL[toOwner]} 영역`;
   ui.showToast(`${PLAYER_LABEL[player]}: ${card.name} → ${target.name}을(를) ${destLabel}(으)로!`, 2000);
-  await sleep(250);
+  await sleep(500);
 
   const winner = checkInstantWin(state);
   return winner;

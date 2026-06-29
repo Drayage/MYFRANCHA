@@ -3,3 +3,7 @@
 *.log
 # local screenshots / scratch
 .shot-*.png
+
+# test screenshots
+.t-*.png
+.s-*.png

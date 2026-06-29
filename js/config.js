@@ -24,23 +24,23 @@ export const TRADEMARKS = [
 export const CARD_DEFS = {
   apply: {
     id: 'apply', name: '출원', emoji: '📄',
-    short: '중앙의 상표를 내 영역으로',
+    short: '중앙 상표 → 내 상표',
     desc: '중앙(공개)에 있는 상표 1개를 내 영역으로 가져온다.',
   },
   prove: {
-    id: 'prove', name: '사실관계증명', emoji: '📑',
-    short: '상대의 상표를 빼앗아 내 영역으로',
+    id: 'prove', name: '사실관계증명', emoji: '🔍',
+    short: '상대 상표 → 내 상표',
     desc: '상대 영역의 상표 1개를 강제로 뒤집어 내 영역으로 가져온다.',
   },
   cancel: {
-    id: 'cancel', name: '불사용취소심판', emoji: '🚫',
-    short: '상대의 상표를 중앙으로 리셋',
+    id: 'cancel', name: '불사용취소심판', display: '불사용<br>취소심판', emoji: '⏪',
+    short: '상대 상표 → 중앙',
     desc: '상대 영역의 상표 1개를 중앙(공개)으로 되돌린다.',
   },
   smother: {
-    id: 'smother', name: '소송뭉개기', emoji: '🗂️',
-    short: '상대 카드 1장의 효과 무효',
-    desc: '이번 세트에서 상대가 낸, 아직 처리되지 않은 카드 1장의 효과를 무효화한다.',
+    id: 'smother', name: '소송뭉개기', emoji: '🚫',
+    short: '상대 카드 → 무효',
+    desc: '같은 턴에 상대가 낸 카드 1장의 효과를 무효화한다.',
   },
 };
 
