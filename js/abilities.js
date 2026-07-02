@@ -16,8 +16,8 @@ export const ABILITIES = {
   daiso:    { name: '다없소',     icon: '🔁', desc: '라운드 시작 시 손패의 출원 1장을 소송뭉개기로 바꾼다.' },
   dunkin:   { name: '던진도너츠', icon: '🍩', desc: '소송뭉개기로 무효화할 때 상대의 같은 턴 카드 효과를 복사한다.' },
   toast:    { name: '아삭토스트', icon: '🛟', desc: '내 카드는 상대의 소송뭉개기에 면역이다.' },
-  bing:     { name: '덜빙',       icon: '🍧', desc: '형제 토큰 더빙이 추가되어 4개 모두 확보해야 승리한다.' },
-  gimbap:   { name: '김밥전구',   icon: '⏳', desc: '상표를 모두 확보해도 즉시 승리하지 않는다(5라운드까지).' },
+  bing:     { name: '덜빙',       icon: '🍧', desc: '형제 토큰 더빙이 추가되어 4개 모두 확보해야 승리한다.', ruleChange: true },
+  gimbap:   { name: '김밥전구',   icon: '⏳', desc: '상표를 모두 확보해도 즉시 승리하지 않는다(5라운드까지).', ruleChange: true },
 };
 
 // 능력 모드가 켜졌고 해당 능력 토큰을 소유한 플레이어(아니면 null)
@@ -95,4 +95,16 @@ export function dunkinHolder(state) { return holderOf(state, 'dunkin'); }
 export function keepsFirst(state) {
   const bg = holderOf(state, 'baguette');
   return bg != null && bg === state.firstPlayer;
+}
+
+// 이 카드(플레이어 관점)에 결부된 능력 id 목록 — 카드 좌상단 배지로 표시.
+// "이 카드는 능력 때문에 평소와 다르게 동작한다"를 시각적으로 알려준다.
+export function cardAbilityIcons(state, player, card) {
+  if (!state.abilitiesEnabled) return [];
+  const ids = [];
+  if (card.type === 'apply' && holderOf(state, 'moms') === player) ids.push('moms');
+  if (card.type === 'smother' && holderOf(state, 'dunkin') === player) ids.push('dunkin');
+  if (holderOf(state, 'toast') === player) ids.push('toast');
+  if ((card.type === 'prove' || card.type === 'cancel') && holderOf(state, 'taunt') === opp(player)) ids.push('taunt');
+  return ids;
 }

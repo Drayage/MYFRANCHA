@@ -2,9 +2,22 @@
 import { TOTAL_ROUNDS, PLAYER_LABEL, OWNER } from './config.js';
 import { countOwned } from './state.js';
 import { CARD_BEHAVIOR } from './cards.js';
-import { ABILITIES } from './abilities.js';
+import { ABILITIES, cardAbilityIcons } from './abilities.js';
 
 const cardLabel = (card) => card.display || card.name;
+
+// 카드에 결부된 능력들을 좌상단 작은 배지로 렌더(빈 배열이면 아무것도 안 그림)
+// variant: 'hand'(손패 카드, 카드 밖으로 살짝 튀어나옴) | 'reveal'(공개 카드, 순번 배지와 안 겹치게 안쪽)
+function abilityBadgesHTML(ids, variant = 'hand') {
+  if (!ids.length) return '';
+  const cls = variant === 'reveal' ? 'rcard-ab-badges' : 'card-ab-badges';
+  const badgeCls = variant === 'reveal' ? 'rcard-ab-badge' : 'card-ab-badge';
+  const items = ids.map((id) => {
+    const info = ABILITIES[id];
+    return `<span class="${badgeCls}" title="${info.name}: ${info.desc}">${info.icon}</span>`;
+  }).join('');
+  return `<span class="${cls}">${items}</span>`;
+}
 
 const $ = (id) => document.getElementById(id);
 
@@ -19,7 +32,7 @@ export function buildBoard(state) {
     // 능력 모드 ON이면 상표 우상단에 능력 마커 표시
     const info = state.abilitiesEnabled ? ABILITIES[tm.ability] : null;
     const marker = info
-      ? `<span class="tm-ability" data-ability="${tm.ability}" title="${info.name}: ${info.desc}">${info.icon}</span>`
+      ? `<span class="tm-ability${info.ruleChange ? ' rule-change' : ''}" data-ability="${tm.ability}" title="${info.name}: ${info.desc}${info.ruleChange ? ' (룰 변경!)' : ''}">${info.icon}</span>`
       : '';
     el.innerHTML = `${marker}<span class="tm-emoji">${tm.emoji}</span><span class="tm-name">${tm.name}</span>`;
     // 능력 모드: 상표 클릭 시 능력을 카드형 말풍선으로 표시
@@ -177,6 +190,7 @@ export function selectCards(state, player, count, { peekInfo = null } = {}) {
       c.dataset.uid = card.uid;
       c.innerHTML = `
         <span class="order-badge" style="display:none"></span>
+        ${abilityBadgesHTML(cardAbilityIcons(state, player, card))}
         <span class="card-emoji">${card.emoji}</span>
         <span class="card-name">${cardLabel(card)}</span>
         <span class="card-short">${card.short}</span>
@@ -237,9 +251,9 @@ export function selectTrademark(validTms, promptText) {
 const reduced = () =>
   window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// slots: {A:[slot..], B:[slot..]}, order: [[player, slotIdx], ...] (처리 순서), firstPlayer.
+// slots: {A:[slot..], B:[slot..]}, order: [[player, slotIdx], ...] (처리 순서).
 // 처리 순서대로 가로 시퀀스 + 화살표 + 순번 배지로 공개 순서를 보여준다.
-export function showRevealArea(slots, order, firstPlayer) {
+export function showRevealArea(state, slots, order) {
   const area = $('reveal-area');
   area.innerHTML = '';
   area.classList.add('show');
@@ -250,22 +264,25 @@ export function showRevealArea(slots, order, firstPlayer) {
       arrow.textContent = '→';
       area.appendChild(arrow);
     }
-    const role = player === firstPlayer ? '선' : '후';
-    area.appendChild(makeRevealCard(player, slotIdx, slots[player][slotIdx]?.card, role, seq + 1));
+    const role = player === state.firstPlayer ? '선' : '후';
+    const card = slots[player][slotIdx]?.card;
+    area.appendChild(makeRevealCard(state, player, slotIdx, card, role, seq + 1));
   });
 }
 
-function makeRevealCard(player, slot, card, role, seqNo) {
+function makeRevealCard(state, player, slot, card, role, seqNo) {
   const el = document.createElement('div');
   el.className = 'rcard';
   el.dataset.player = player;
   el.dataset.slot = slot;
+  const badges = card ? abilityBadgesHTML(cardAbilityIcons(state, player, card), 'reveal') : '';
   el.innerHTML = `
     <div class="rcard-seq">${seqNo}</div>
     <div class="rcard-who ${player === 'A' ? 'who-a' : 'who-b'}">${PLAYER_LABEL[player]}·턴${slot + 1}·${role}</div>
     <div class="rcard-inner">
       <div class="rcard-face rcard-back">🏷️</div>
       <div class="rcard-face rcard-front">
+        ${badges}
         <span class="rcard-emoji">${card ? card.emoji : ''}</span>
         <span class="rcard-name">${card ? cardLabel(card) : ''}</span>
       </div>

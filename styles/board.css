@@ -85,6 +85,16 @@
   animation: abilityPulse .8s ease-in-out 2;
   background: var(--gold); color: #2a1850;
 }
+/* 룰을 바꾸는 능력(덜빙·김밥전구)은 테두리를 다르게 해서 눈에 띄게 */
+.tm-ability.rule-change {
+  border: 2px dashed var(--b);
+  background: linear-gradient(135deg, #3a1030, #1f0a20);
+  animation: ruleChangeGlow 1.8s ease-in-out infinite;
+}
+.tm-ability.rule-change.ability-active {
+  animation: abilityPulse .8s ease-in-out 2;
+  background: var(--gold); color: #2a1850; border-style: dashed; border-color: var(--b);
+}
 
 /* 선택 가능 상표 하이라이트 */
 .tm-token.targetable {

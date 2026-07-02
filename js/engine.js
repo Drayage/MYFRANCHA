@@ -109,7 +109,7 @@ async function resolveSet(state, submissions, size, recorder) {
 
   // 1) 처리 순서대로 뒷면 공개 → 왼쪽부터 순차 플립
   const order = buildOrder(state.firstPlayer, size);
-  ui.showRevealArea(slots, order, state.firstPlayer);
+  ui.showRevealArea(state, slots, order);
   ui.setBanner(`R${state.round} ${['1차','2차','3차'][state.setIndex]} · 카드 공개!`);
   await sleep(650);
   await ui.flipRevealAll();

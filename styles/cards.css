@@ -25,6 +25,16 @@
   background: var(--gold); color: #2a1850; font-weight: 900; font-size: .85rem;
   display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); z-index: 5;
 }
+
+/* 카드에 결부된 능력 배지(좌상단) — "이 카드는 능력 때문에 다르게 동작한다" 표시 */
+.card-ab-badges {
+  position: absolute; top: -8px; left: -8px; display: flex; gap: 2px; z-index: 5;
+}
+.card-ab-badge {
+  width: 20px; height: 20px; border-radius: 50%; background: #1f1440; color: #fff;
+  font-size: .74rem; display: flex; align-items: center; justify-content: center;
+  border: 2px solid #7b4dff; box-shadow: var(--shadow);
+}
 .card:hover { transform: translateY(-6px); box-shadow: var(--shadow); }
 .card.selected { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold), var(--shadow); transform: translateY(-6px); }
 .card-emoji { font-size: 1.6rem; }
@@ -89,6 +99,14 @@
 }
 .rcard-emoji { font-size: 1.5rem; }
 .rcard-name { font-size: .64rem; font-weight: 800; text-align: center; }
+
+/* 공개 카드의 능력 배지 — 카드 안쪽 좌상단(바깥의 순번 배지와 안 겹치게) */
+.rcard-ab-badges { position: absolute; top: 3px; left: 3px; display: flex; gap: 2px; z-index: 3; }
+.rcard-ab-badge {
+  width: 15px; height: 15px; border-radius: 50%; background: #1f1440; color: #fff;
+  font-size: .58rem; display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid #7b4dff;
+}
 .rcard.active .rcard-inner { box-shadow: 0 0 0 3px var(--gold); border-radius: 12px; }
 .rcard-stamp {
   position: absolute; top: 24px; left: 50%; transform: translate(-50%, 0) rotate(-14deg) scale(0);
@@ -117,9 +135,11 @@
   .card-name { font-size: .72rem; }
   .card-short { font-size: .56rem; }
   .order-badge { width: 20px; height: 20px; font-size: .72rem; top: -6px; right: -6px; }
+  .card-ab-badge { width: 17px; height: 17px; font-size: .64rem; }
   .reveal-arrow { font-size: 1.1rem; }
   .rcard, .rcard-inner { width: 62px; }
   .rcard-inner { height: 56px; }
   .rcard-emoji { font-size: 1.1rem; }
   .rcard-name { font-size: .56rem; }
+  .rcard-ab-badge { width: 12px; height: 12px; font-size: .5rem; }
 }

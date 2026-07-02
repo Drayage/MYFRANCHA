@@ -32,6 +32,12 @@
   50% { transform: scale(1.35); box-shadow: 0 0 0 8px rgba(255,207,77,0); }
 }
 
+/* 룰 변경 능력 마커 — 상시 경고성 펄스로 눈에 띄게 */
+@keyframes ruleChangeGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,77,109,.6), var(--shadow); }
+  50% { box-shadow: 0 0 0 6px rgba(255,77,109,0), var(--shadow); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .tm-shake, .tm-token.targetable, .zone-flash { animation: none !important; }
+  .tm-shake, .tm-token.targetable, .zone-flash, .tm-ability.rule-change { animation: none !important; }
 }
