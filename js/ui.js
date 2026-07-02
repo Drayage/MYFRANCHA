@@ -2,7 +2,7 @@
 import { TOTAL_ROUNDS, PLAYER_LABEL, OWNER } from './config.js';
 import { countOwned } from './state.js';
 import { CARD_BEHAVIOR } from './cards.js';
-import { ABILITY_INFO } from './abilities.js';
+import { ABILITIES } from './abilities.js';
 
 const cardLabel = (card) => card.display || card.name;
 
@@ -17,18 +17,45 @@ export function buildBoard(state) {
     el.dataset.tm = tm.id;
     el.dataset.owner = tm.owner;
     // 능력 모드 ON이면 상표 우상단에 능력 마커 표시
-    const marker = state.abilitiesEnabled && ABILITY_INFO[tm.ability]
-      ? `<span class="tm-ability" data-ability="${tm.ability}" title="${ABILITY_INFO[tm.ability].name}: ${ABILITY_INFO[tm.ability].desc}">${ABILITY_INFO[tm.ability].icon}</span>`
+    const info = state.abilitiesEnabled ? ABILITIES[tm.ability] : null;
+    const marker = info
+      ? `<span class="tm-ability" data-ability="${tm.ability}" title="${info.name}: ${info.desc}">${info.icon}</span>`
       : '';
     el.innerHTML = `${marker}<span class="tm-emoji">${tm.emoji}</span><span class="tm-name">${tm.name}</span>`;
-    // 능력 모드: 상표 클릭 시 어떤 능력인지 알려줌
-    if (state.abilitiesEnabled && ABILITY_INFO[tm.ability]) {
-      const info = ABILITY_INFO[tm.ability];
+    // 능력 모드: 상표 클릭 시 능력을 카드형 말풍선으로 표시
+    if (info) {
       el.style.cursor = 'pointer';
-      el.addEventListener('click', () => showToast(`${info.icon} ${tm.name}의 능력 — ${info.desc}`, 3000, { multi: true }));
+      el.addEventListener('click', (e) => { e.stopPropagation(); showAbilityCard(tm, info, el); });
     }
     $(`zone-${tm.owner}`).appendChild(el);
   }
+}
+
+// 상표 능력을 카드형 말풍선으로 표시(클릭). 화면 아무데나 누르면 닫힘.
+let abilityCardEl = null;
+export function showAbilityCard(tm, info, anchorEl) {
+  hideAbilityCard();
+  const card = document.createElement('div');
+  card.className = 'ability-card';
+  card.innerHTML = `
+    <div class="ac-head"><span class="ac-emoji">${tm.emoji}</span>
+      <span class="ac-name">${tm.name}</span></div>
+    <div class="ac-badge">${info.icon} ${info.name} 능력</div>
+    <div class="ac-desc">${info.desc}</div>`;
+  document.body.appendChild(card);
+  const r = anchorEl.getBoundingClientRect();
+  const cw = card.offsetWidth, ch = card.offsetHeight;
+  let left = Math.min(Math.max(8, r.left + r.width / 2 - cw / 2), window.innerWidth - cw - 8);
+  let top = r.top - ch - 12;
+  if (top < 8) top = Math.min(r.bottom + 12, window.innerHeight - ch - 8);
+  card.style.left = `${left}px`;
+  card.style.top = `${top}px`;
+  requestAnimationFrame(() => card.classList.add('show'));
+  abilityCardEl = card;
+  setTimeout(() => document.addEventListener('pointerdown', hideAbilityCard, { once: true }), 0);
+}
+function hideAbilityCard() {
+  if (abilityCardEl) { abilityCardEl.remove(); abilityCardEl = null; }
 }
 
 // 능력 발동 시 해당 상표 마커를 잠깐 강조
@@ -58,8 +85,17 @@ export function updateHUD(state) {
   $('hud-own-a').textContent = `상표 ${countOwned(state, 'A')}`;
   $('hud-own-b').textContent = `상표 ${countOwned(state, 'B')}`;
   // 선플레이어 영역 라벨에 (선) 마커
-  $('first-A').style.display = state.firstPlayer === 'A' ? 'inline-flex' : 'none';
-  $('first-B').style.display = state.firstPlayer === 'B' ? 'inline-flex' : 'none';
+  $('first-A').style.visibility = state.firstPlayer === 'A' ? 'visible' : 'hidden';
+  $('first-B').style.visibility = state.firstPlayer === 'B' ? 'visible' : 'hidden';
+  // 사람/AI 진영 표시(AI 모드)
+  if (state.mode === 'ai') {
+    $('side-A').textContent = state.humanSide === 'A' ? '나' : 'AI';
+    $('side-B').textContent = state.humanSide === 'B' ? '나' : 'AI';
+    $('side-A').className = `side-badge ${state.humanSide === 'A' ? 'me' : 'ai'}`;
+    $('side-B').className = `side-badge ${state.humanSide === 'B' ? 'me' : 'ai'}`;
+  } else {
+    $('side-A').textContent = ''; $('side-B').textContent = '';
+  }
 }
 
 export function setBanner(text) { $('banner').textContent = text; }

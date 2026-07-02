@@ -13,12 +13,29 @@ export const OWNER = { CENTER: 'center', A: 'A', B: 'B' };
 // 플레이어 표시 이름 (갑/을)
 export const PLAYER_LABEL = { A: '갑', B: '을' };
 
-// 상표 3종 — 각 상표는 능력 1개 보유(선택 모드에서만 활성)
-export const TRADEMARKS = [
-  { id: 'coffee',     name: '맹한커피',   emoji: '☕', ability: 'coffee' },
-  { id: 'burger',     name: '햄부기퀸',   emoji: '🍔', ability: 'burger' },
-  { id: 'tteok',      name: '염라떡볶이', emoji: '🌶️', ability: 'tteok'  },
+// 상표 풀 — 각 상표 id == 능력 id(1:1). 능력 메타/훅은 abilities.js.
+// (참고용 실제 브랜드명은 게임에 표기하지 않음 — 저작권)
+export const TRADEMARK_POOL = [
+  { id: 'coffee',   name: '맹한커피',   emoji: '☕',  rarity: 10 },
+  { id: 'burger',   name: '햄부기퀸',   emoji: '🍔', rarity: 10 },
+  { id: 'baguette', name: '빨리바게뜨', emoji: '🥖', rarity: 10 },
+  { id: 'taunt',    name: '배툭튀떡',   emoji: '🍢', rarity: 10 },
+  { id: 'pig',      name: '화남돼지집', emoji: '🐷', rarity: 10 },
+  { id: 'cu',       name: '쉬어유',     emoji: '🏪', rarity: 10 },
+  { id: 'moms',     name: '남스터치',   emoji: '🍗', rarity: 10 },
+  { id: 'daiso',    name: '다없소',     emoji: '🧺', rarity: 10 },
+  { id: 'dunkin',   name: '던진도너츠', emoji: '🍩', rarity: 6 },
+  { id: 'toast',    name: '아삭토스트', emoji: '🍞', rarity: 10 },
+  { id: 'bing',     name: '덜빙',       emoji: '🍧', rarity: 2 },  // 룰 변경(4토큰)
+  { id: 'gimbap',   name: '김밥전구',   emoji: '🍙', rarity: 2 },  // 룰 변경(무한 지구전)
 ];
+
+// 능력 모드(전국 OFF)에서 고정 출전하는 3상표
+export const BASE_ABILITY_IDS = ['cu', 'baguette', 'moms'];
+// 룰을 바꾸는 상표(전국시대에서만, 낮은 확률)
+export const RULE_CHANGE_IDS = ['bing', 'gimbap'];
+// 덜빙이 뽑히면 추가되는 무능력 형제 토큰
+export const DUBBING_TM = { id: 'dubbing', name: '더빙', emoji: '🧊' };
 
 // 카드 4종 메타데이터. 실제 효과 로직은 cards.js.
 export const CARD_DEFS = {

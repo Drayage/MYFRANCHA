@@ -68,6 +68,28 @@ body {
 /* 레이어 */
 .layer { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
 
+/* 능력 카드형 말풍선(상표 클릭) */
+.ability-card {
+  position: fixed; z-index: 75; width: max-content; max-width: min(260px, 88vw);
+  background: linear-gradient(160deg, #fff, #ece7ff); color: #2a1850;
+  border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow);
+  border: 2px solid var(--gold); opacity: 0; transform: translateY(6px) scale(.96);
+  transition: opacity .18s ease, transform .18s ease; pointer-events: none;
+}
+.ability-card.show { opacity: 1; transform: translateY(0) scale(1); }
+.ability-card::after {
+  content: ""; position: absolute; bottom: -9px; left: 50%; transform: translateX(-50%);
+  border: 9px solid transparent; border-top-color: var(--gold);
+}
+.ac-head { display: flex; align-items: center; gap: 6px; }
+.ac-emoji { font-size: 1.4rem; }
+.ac-name { font-weight: 900; font-size: 1rem; }
+.ac-badge {
+  display: inline-block; margin: 6px 0 4px; padding: 2px 8px; border-radius: 999px;
+  background: #2a1850; color: #ffd76a; font-size: .74rem; font-weight: 800;
+}
+.ac-desc { font-size: .84rem; font-weight: 600; line-height: 1.35; }
+
 /* 토스트 — 기본 1줄(말줄임), multi면 여러 줄 허용 */
 .toast {
   position: relative; margin: 8px auto; max-width: 92vw; width: fit-content;

@@ -1,18 +1,19 @@
-// engine.js — 라운드/페이즈 진행 상태기계 + 카드 해결 파이프라인
+// engine.js — 라운드/페이즈 진행 상태기계 + 카드 해결 파이프라인 (+ 능력 훅)
 import { TOTAL_ROUNDS, SET_SIZES, PLAYER_LABEL, OWNER } from './config.js';
 import {
   dealHand, opponentOf, applyMove, checkInstantWin,
   evaluateRoundToken, finalResult, countOwned,
 } from './state.js';
 import { CARD_BEHAVIOR } from './cards.js';
-import { burgerKeepsToken, coffeePeek } from './abilities.js';
+import * as ab from './abilities.js';
 import * as ai from './ai.js';
 import * as ui from './ui.js';
 import * as theater from './theater.js';
-import { move, shakeToken, sleep } from './animation.js';
+import { move, sleep } from './animation.js';
 
-const isHuman = (state, player) => state.mode === 'local' || player === 'A';
+const isHuman = (state, player) => state.mode === 'local' || player === state.humanSide;
 const describe = (cards) => cards.map((c) => c.name).join(', ');
+const MOVE_TYPES = ['apply', 'prove', 'cancel'];
 
 // 게임 1판 실행. recorder에 이벤트를 기록한다.
 export async function runGame(state, recorder) {
@@ -24,7 +25,13 @@ export async function runGame(state, recorder) {
     state.roundSecuredTwo = null;
     state.hands.A = dealHand();
     state.hands.B = dealHand();
+
+    // 라운드 시작 능력(보호막/패 변환)
+    const rs = ab.onRoundStart(state);
+    if (rs.shield) { ui.flashAbility('pig'); ui.showToast(`🛡️ 화남돼지집: ${PLAYER_LABEL[rs.shield]} 보호막 획득`); }
+    if (rs.daiso) { ui.flashAbility('daiso'); ui.showToast(`🔁 다없소: ${PLAYER_LABEL[rs.daiso]} 출원→소송뭉개기`); }
     ui.updateHUD(state);
+    if (rs.shield || rs.daiso) await sleep(500);
 
     for (let s = 0; s < SET_SIZES.length; s++) {
       state.setIndex = s;
@@ -36,12 +43,12 @@ export async function runGame(state, recorder) {
       const ended = await resolveSet(state, submissions, size, recorder);
       if (ended) { state.phase = 'game-over'; return endGame(state, recorder, { reason: 'instant', winner: state.winner }); }
 
-      // 세트 종료 → 선플레이어 토큰 교대(햄부기퀸이면 유지)
-      if (!burgerKeepsToken(state)) {
+      // 세트 종료 → 선플레이어 토큰 교대(빨리바게뜨 보유자면 유지)
+      if (!ab.keepsFirst(state)) {
         state.firstPlayer = opponentOf(state.firstPlayer);
       } else {
-        ui.flashAbility('burger');
-        ui.showToast(`👑 햄부기퀸: ${PLAYER_LABEL[state.firstPlayer]} 선플 유지`);
+        ui.flashAbility('baguette');
+        ui.showToast(`👑 빨리바게뜨: ${PLAYER_LABEL[state.firstPlayer]} 선 유지`);
       }
       ui.updateHUD(state);
       await sleep(300);
@@ -60,16 +67,15 @@ export async function runGame(state, recorder) {
 
 // ── 제출 수집 ──
 async function collectSubmissions(state, size) {
-  // 맹한커피 미리보기: peek 보유 플레이어를 마지막에 제출시킨다.
-  let order = ['A', 'B'];
-  if (coffeePeek(state, 'A')) order = ['B', 'A'];
-  else if (coffeePeek(state, 'B')) order = ['A', 'B'];
+  // 미리보기(peek) 능력자를 마지막에 제출시켜 상대 카드를 보게 한다.
+  const peeker = ab.peekerFor(state);
+  const order = peeker ? [ab.opp(peeker.player), peeker.player] : ['A', 'B'];
 
   const result = {};
   for (const player of order) {
-    const peek = coffeePeek(state, player) && result[opponentOf(player)]
-      ? describe(result[opponentOf(player)]) : null;
-    if (peek) ui.flashAbility('coffee');
+    const canPeek = peeker && player === peeker.player && result[opponentOf(player)];
+    const peek = canPeek ? describe(result[opponentOf(player)].map((s) => s.card)) : null;
+    if (peek) ui.flashAbility(peeker.ability);
     result[player] = await getSubmission(state, player, size, peek);
   }
   return result;
@@ -85,14 +91,12 @@ async function getSubmission(state, player, size, peek) {
     await sleep(500);
     chosen = ai.chooseSubmission(state, player, size);
   }
-  // 손패에서 제거
   const uids = new Set(chosen.map((c) => c.uid));
   state.hands[player] = state.hands[player].filter((c) => !uids.has(c.uid));
   return chosen.map((card) => ({ card, owner: player, resolved: false, nullified: false }));
 }
 
 // ── 세트 해결 ──
-// size 1: 선플→후플. size 2: 선플/후플 번갈아 1장씩.
 function buildOrder(firstPlayer, size) {
   const second = opponentOf(firstPlayer);
   const order = [];
@@ -103,22 +107,25 @@ function buildOrder(firstPlayer, size) {
 async function resolveSet(state, submissions, size, recorder) {
   const slots = { A: submissions.A, B: submissions.B };
 
-  // 1) 처리 순서대로 카드를 뒷면으로 공개 영역에 깔고(화살표/순번 표시) → 잠깐 뒤 한꺼번에 플립
+  // 1) 처리 순서대로 뒷면 공개 → 왼쪽부터 순차 플립
   const order = buildOrder(state.firstPlayer, size);
   ui.showRevealArea(slots, order, state.firstPlayer);
   ui.setBanner(`R${state.round} ${['1차','2차','3차'][state.setIndex]} · 카드 공개!`);
-  await sleep(650);              // 뒷면을 잠깐 보여준 뒤
-  await ui.flipRevealAll();      // 동시에 뒤집기
+  await sleep(650);
+  await ui.flipRevealAll();
   await sleep(550);
 
-  // 2) 같은 턴 무효화 선계산: 한 슬롯에 소송뭉개기가 있으면 상대의 같은 슬롯 카드를 무효화
+  // 2) 같은 턴 무효화 선계산(면책이면 스킵). 소송뭉개기는 '사용됨' 표시.
   for (let i = 0; i < size; i++) {
     for (const p of ['A', 'B']) {
       const slot = slots[p][i];
       if (slot && slot.card.type === 'smother') {
         const victim = slots[opponentOf(p)][i];
-        if (victim) { victim.nullified = true; ui.markRevealNullified(opponentOf(p), i); }
-        ui.markRevealUsed(p, i);   // 소송뭉개기는 이 시점에 이미 사용됨
+        if (victim && !ab.isNullifyImmune(state, victim.owner)) {
+          victim.nullified = true;
+          ui.markRevealNullified(opponentOf(p), i);
+        }
+        ui.markRevealUsed(p, i);
       }
     }
   }
@@ -130,7 +137,7 @@ async function resolveSet(state, submissions, size, recorder) {
     if (!slot) continue;
     slot.resolved = true;
     ui.highlightRevealCard(player, idx);
-    const win = await resolveCard(state, player, slot, recorder);
+    const win = await resolveCard(state, player, slot, slots, idx, recorder);
     ui.updateHUD(state);
     if (win) { state.winner = win; ui.clearRevealArea(); return true; }
 
@@ -146,7 +153,7 @@ async function resolveSet(state, submissions, size, recorder) {
   return false;
 }
 
-async function resolveCard(state, player, slot, recorder) {
+async function resolveCard(state, player, slot, slots, idx, recorder) {
   const card = slot.card;
   const opp = opponentOf(player);
 
@@ -156,18 +163,39 @@ async function resolveCard(state, player, slot, recorder) {
     return null;
   }
 
-  // 소송뭉개기: 같은 턴 상대 카드 무효화는 이미 (2)에서 적용됨. 여기선 연출만.
+  // 소송뭉개기: 같은 턴 상대 카드 무효화(면책 반영은 (2)). 여기선 연출 + 던진도너츠 복사.
   if (card.type === 'smother') {
+    const co = slots[opp][idx];
+    if (co && ab.isNullifyImmune(state, co.owner)) {
+      ui.flashAbility('toast');
+      ui.showToast(`🛟 아삭토스트 면역: ${PLAYER_LABEL[player]} 소송뭉개기 실패`, 2000);
+      await sleep(400);
+      return null;
+    }
     recorder.add({ kind: 'nullify', round: state.round, actor: player, victim: opp });
     ui.showToast(`🚫 ${PLAYER_LABEL[player]} 소송뭉개기: ${PLAYER_LABEL[opp]} 같은 턴 무효`, 2000);
     await theater.say(state, { cardType: 'smother', actor: player, victim: opp });
     await sleep(300);
+    // 던진도너츠: 무효화한 상대 카드(이동 카드)의 효과를 복사
+    if (ab.dunkinHolder(state) === player && co && MOVE_TYPES.includes(co.card.type)) {
+      ui.flashAbility('dunkin');
+      ui.showToast(`🍩 던진도너츠 역고소 카피: ${co.card.name} 효과 복사!`, 2000);
+      await sleep(300);
+      return performMove(state, player, co.card, recorder);
+    }
     return null;
   }
 
   // 상표 이동 카드
+  return performMove(state, player, card, recorder);
+}
+
+// 상표 이동 카드 처리(일반 + 던진도너츠 복사 공용). 승자 반환 or null.
+async function performMove(state, player, card, recorder) {
+  const opp = opponentOf(player);
   const behavior = CARD_BEHAVIOR[card.type];
-  const valid = behavior.validTargets(state, player);
+  let valid = behavior.validTargets(state, player);
+  valid = ab.modifyTargets(state, player, card, valid);
   if (valid.length === 0) {
     ui.showToast(`${PLAYER_LABEL[player]} ${card.name}: 대상 없음(불발)`);
     await sleep(500);
@@ -184,25 +212,32 @@ async function resolveCard(state, player, slot, recorder) {
   }
 
   const toOwner = behavior.toOwner(state, player);
-  const collision = card.type === 'prove'; // 강제 뒤집기 = 충돌 연출
   const fromOwner = target.owner;
 
+  // 방어 능력(보호막/복불복)으로 공격이 막히는지
+  const blk = ab.checkAttackBlocked(state, target, player);
+  if (blk && blk.blocked) {
+    ui.flashAbility(blk.ability);
+    ui.showToast(blk.text, 2000);
+    await sleep(500);
+    return null;
+  }
+
+  const collision = fromOwner === opp; // 상대 상표를 뺏김/리셋 = 충돌 연출
   await theater.say(state, { cardType: card.type, actor: player, victim: opp });
   await move(target.id, toOwner, { collision });
   applyMove(state, target.id, toOwner);
 
   recorder.add({
     kind: 'move', round: state.round, setIndex: state.setIndex,
-    actor: player, cardType: card.type, tmId: target.id,
-    fromOwner, toOwner, collision,
+    actor: player, cardType: card.type, tmId: target.id, fromOwner, toOwner, collision,
   });
 
   const destLabel = toOwner === OWNER.CENTER ? '중앙' : PLAYER_LABEL[toOwner];
   ui.showToast(`${PLAYER_LABEL[player]} ${card.name}: ${target.name} → ${destLabel}`, 2000);
   await sleep(500);
 
-  const winner = checkInstantWin(state);
-  return winner;
+  return checkInstantWin(state);
 }
 
 function endGame(state, recorder, result) {

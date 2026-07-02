@@ -29,7 +29,8 @@
 
       <div class="toggles">
         <label class="toggle"><input type="checkbox" id="toggle-tutorial" /> 📖 튜토리얼 켜기 (첫 가이드)</label>
-        <label class="toggle"><input type="checkbox" id="toggle-abilities" /> 🧬 상표 능력 모드 (확장)</label>
+        <label class="toggle"><input type="checkbox" id="toggle-abilities" /> 🧬 상표 능력 모드 (기본 3종)</label>
+        <label class="toggle"><input type="checkbox" id="toggle-expansion" /> 🌏 상표전국시대 확장 (풀 랜덤·능력 포함)</label>
         <label class="toggle"><input type="checkbox" id="toggle-theater" /> 🎭 연극모드 (갑·을 대사)</label>
       </div>
 
@@ -68,7 +69,7 @@
 
     <main id="board" class="board">
       <div class="zone zone-a-wrap">
-        <div class="zone-label">🔵 갑(A) <span id="first-A" class="first-badge">선</span> <span id="hud-own-a" class="own">상표 0</span></div>
+        <div class="zone-label">🔵 갑(A) <span id="side-A" class="side-badge"></span> <span id="first-A" class="first-badge">선</span> <span id="hud-own-a" class="own">상표 0</span></div>
         <div id="zone-A" class="zone-drop"></div>
       </div>
       <div class="zone zone-center-wrap">
@@ -76,7 +77,7 @@
         <div id="zone-center" class="zone-drop"></div>
       </div>
       <div class="zone zone-b-wrap">
-        <div class="zone-label">🔴 을(B) <span id="first-B" class="first-badge">선</span> <span id="hud-own-b" class="own">상표 0</span></div>
+        <div class="zone-label">🔴 을(B) <span id="side-B" class="side-badge"></span> <span id="first-B" class="first-badge">선</span> <span id="hud-own-b" class="own">상표 0</span></div>
         <div id="zone-B" class="zone-drop"></div>
       </div>
     </main>

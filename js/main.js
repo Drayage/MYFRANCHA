@@ -11,6 +11,7 @@ const show = (id) => { $('screen-start').classList.toggle('hidden', id !== 'star
 function readOptions() {
   return {
     abilitiesEnabled: $('toggle-abilities').checked,
+    expansionEnabled: $('toggle-expansion').checked,
     theaterEnabled: $('toggle-theater').checked,
   };
 }

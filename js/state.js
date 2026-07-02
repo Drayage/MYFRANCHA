@@ -1,9 +1,46 @@
 // state.js — 게임 상태 모델 + 순수 헬퍼
-import { TOTAL_ROUNDS, OWNER, TRADEMARKS, FIXED_HAND, CARD_DEFS } from './config.js';
+import {
+  TOTAL_ROUNDS, OWNER, FIXED_HAND, CARD_DEFS,
+  TRADEMARK_POOL, BASE_ABILITY_IDS, RULE_CHANGE_IDS, DUBBING_TM,
+} from './config.js';
 
 let cardSeq = 0;
-function makeCard(typeId) {
+export function makeCard(typeId) {
   return { uid: `c${++cardSeq}`, type: typeId, ...CARD_DEFS[typeId] };
+}
+
+// rarity 가중 비복원 샘플링
+function weightedSample(pool, n) {
+  const arr = [...pool];
+  const out = [];
+  for (let k = 0; k < n && arr.length; k++) {
+    const total = arr.reduce((s, t) => s + (t.rarity || 10), 0);
+    let r = Math.random() * total;
+    let idx = 0;
+    for (let i = 0; i < arr.length; i++) { r -= (arr[i].rarity || 10); if (r <= 0) { idx = i; break; } }
+    out.push(arr.splice(idx, 1)[0]);
+  }
+  return out;
+}
+
+// 보드 상표 구성:
+// 전국 ON → 전체 풀 랜덤 / 능력 ON(전국 OFF) → 고정 3 / 둘 다 OFF → 일반 풀 랜덤(능력 무효)
+function buildTrademarks(expansion, abilities) {
+  let picked;
+  if (expansion) {
+    picked = weightedSample(TRADEMARK_POOL, 3);
+  } else if (abilities) {
+    picked = BASE_ABILITY_IDS.map((id) => TRADEMARK_POOL.find((t) => t.id === id));
+  } else {
+    const normal = TRADEMARK_POOL.filter((t) => !RULE_CHANGE_IDS.includes(t.id));
+    picked = weightedSample(normal, 3);
+  }
+  const tms = picked.map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, ability: t.id, owner: OWNER.CENTER }));
+  // 덜빙이 뽑히면 무능력 형제 토큰(더빙) 추가 → 4개 올킬
+  if (picked.some((t) => t.id === 'bing')) {
+    tms.push({ id: DUBBING_TM.id, name: DUBBING_TM.name, emoji: DUBBING_TM.emoji, ability: null, owner: OWNER.CENTER });
+  }
+  return tms;
 }
 
 // 매 라운드 고정 손패(출원2/증명1/취소1/뭉개1 = 5장)를 순서만 섞어 지급
@@ -17,19 +54,26 @@ export function dealHand() {
 }
 
 // 새 게임 상태 생성
-export function createState({ mode = 'ai', abilitiesEnabled = false, theaterEnabled = false } = {}) {
+export function createState({ mode = 'ai', abilitiesEnabled = false, expansionEnabled = false, theaterEnabled = false } = {}) {
+  const abilities = expansionEnabled || abilitiesEnabled;   // 전국시대는 능력 포함
+  const trademarks = buildTrademarks(expansionEnabled, abilities);
+  const noInstantWin = trademarks.some((t) => t.ability === 'gimbap');
   return {
     mode,                       // 'ai' | 'local'
-    abilitiesEnabled,
+    abilitiesEnabled: abilities,
+    expansionEnabled,
     theaterEnabled,
+    humanSide: mode === 'ai' ? (Math.random() < 0.5 ? 'A' : 'B') : 'A', // AI모드는 사람 진영 랜덤
     round: 1,
     setIndex: 0,                // 0,1,2 (1차/2차/3차)
     phase: 'setup',             // setup | playing | round-end | game-over
-    firstPlayer: 'A',           // 선플레이어 토큰
-    trademarks: TRADEMARKS.map((t) => ({ ...t, owner: OWNER.CENTER })),
+    firstPlayer: 'A',           // 선플레이어 토큰(선공은 항상 갑)
+    trademarks,
     hands: { A: [], B: [] },
     roundTokens: { A: 0, B: 0 },
     roundSecuredTwo: null,      // 이번 라운드에 먼저 2개 확보한 사람
+    shields: { A: false, B: false }, // 확정 보호막(화남돼지집)
+    noInstantWin,               // 김밥전구: 즉시 승리 없음
     winner: null,
     log: [],
   };
@@ -54,8 +98,9 @@ export function applyMove(state, tmId, toOwner) {
   return from;
 }
 
-// 즉시 승리: 한 플레이어가 상표 3개 모두 소유
+// 즉시 승리: 한 플레이어가 모든 상표 소유 (김밥전구가 있으면 비활성)
 export function checkInstantWin(state) {
+  if (state.noInstantWin) return null;
   for (const p of ['A', 'B']) {
     if (countOwned(state, p) === state.trademarks.length) return p;
   }
