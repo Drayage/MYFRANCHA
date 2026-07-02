@@ -25,6 +25,13 @@
 .zone-center-wrap { border-color: rgba(46,204,113,.35); }
 .zone-label { font-weight: 800; margin-bottom: 8px; font-size: .95rem; }
 .zone-label .own { color: var(--gold); font-size: .82rem; margin-left: 6px; }
+/* 선플레이어 표시 배지 */
+.first-badge {
+  display: none; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%; margin-left: 4px;
+  background: var(--gold); color: #2a1850; font-size: .72rem; font-weight: 900;
+  vertical-align: middle; box-shadow: 0 0 0 2px rgba(255,207,77,.35);
+}
 
 .zone-drop {
   flex: 1; display: flex; flex-flow: column wrap; gap: 10px; align-items: center;

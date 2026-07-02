@@ -21,6 +21,12 @@ export function buildBoard(state) {
       ? `<span class="tm-ability" data-ability="${tm.ability}" title="${ABILITY_INFO[tm.ability].name}: ${ABILITY_INFO[tm.ability].desc}">${ABILITY_INFO[tm.ability].icon}</span>`
       : '';
     el.innerHTML = `${marker}<span class="tm-emoji">${tm.emoji}</span><span class="tm-name">${tm.name}</span>`;
+    // 능력 모드: 상표 클릭 시 어떤 능력인지 알려줌
+    if (state.abilitiesEnabled && ABILITY_INFO[tm.ability]) {
+      const info = ABILITY_INFO[tm.ability];
+      el.style.cursor = 'pointer';
+      el.addEventListener('click', () => showToast(`${info.icon} ${tm.name}의 능력 — ${info.desc}`, 3000, { multi: true }));
+    }
     $(`zone-${tm.owner}`).appendChild(el);
   }
 }
@@ -51,14 +57,17 @@ export function updateHUD(state) {
   $('hud-token-b').textContent = `${PLAYER_LABEL.B}(B) 토큰 ${state.roundTokens.B}`;
   $('hud-own-a').textContent = `상표 ${countOwned(state, 'A')}`;
   $('hud-own-b').textContent = `상표 ${countOwned(state, 'B')}`;
+  // 선플레이어 영역 라벨에 (선) 마커
+  $('first-A').style.display = state.firstPlayer === 'A' ? 'inline-flex' : 'none';
+  $('first-B').style.display = state.firstPlayer === 'B' ? 'inline-flex' : 'none';
 }
 
 export function setBanner(text) { $('banner').textContent = text; }
 
-// ── 토스트(결과 설명) ──
-export function showToast(text, ms = 1800) {
+// ── 토스트(결과 설명) ── 기본은 1줄, multi=true면 여러 줄 허용(능력 설명 등)
+export function showToast(text, ms = 1800, { multi = false } = {}) {
   const t = document.createElement('div');
-  t.className = 'toast';
+  t.className = multi ? 'toast toast-multi' : 'toast';
   t.textContent = text;
   $('toast-layer').appendChild(t);
   requestAnimationFrame(() => t.classList.add('show'));
@@ -143,7 +152,9 @@ export function selectCards(state, player, count, { peekInfo = null } = {}) {
         if (i >= 0) orderSel.splice(i, 1);
         else if (orderSel.length < count) orderSel.push(card.uid);
         renderBadges();
-        showPreview(card);
+        // 다시 눌러 취소하면 영역 강조도 사라지게
+        if (orderSel.includes(card.uid)) showPreview(card);
+        else clearPreview();
       };
       handEl.appendChild(c);
     });
@@ -227,12 +238,14 @@ function makeRevealCard(player, slot, card, role, seqNo) {
   return el;
 }
 
-// 모든 공개 카드를 한꺼번에 플립
+// 공개 카드를 왼쪽부터 주르륵 순차 플립
 export function flipRevealAll() {
   return new Promise((resolve) => {
-    const cards = document.querySelectorAll('#reveal-area .rcard');
-    cards.forEach((c) => c.classList.add('flipped'));
-    setTimeout(resolve, reduced() ? 0 : 780);
+    const cards = [...document.querySelectorAll('#reveal-area .rcard')];
+    const stagger = reduced() ? 0 : 170;
+    cards.forEach((c, i) => setTimeout(() => c.classList.add('flipped'), i * stagger));
+    const total = reduced() ? 0 : (cards.length - 1) * stagger + 700;
+    setTimeout(resolve, total);
   });
 }
 

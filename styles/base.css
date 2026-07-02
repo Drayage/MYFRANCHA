@@ -14,15 +14,15 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; }
+html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; }
 body {
   font-family: "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
   background: radial-gradient(1200px 800px at 50% -10%, var(--bg2), var(--bg));
   color: var(--ink);
-  overflow: hidden;
 }
 
-.screen { position: absolute; inset: 0; display: flex; flex-direction: column; }
+/* 절대배치 화면이 자체 오버플로(카드 툴팁 등)로 스크롤되지 않게 클립 */
+.screen { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; }
 .hidden { display: none !important; }
 
 /* 버튼 */
@@ -58,22 +58,25 @@ body {
 .toggle input { margin-right: 8px; }
 .start-links { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
-/* 배너 */
+/* 배너 — 항상 1줄 */
 .banner {
   margin: 8px 12px; padding: 10px 14px; text-align: center; font-weight: 700;
   background: rgba(255,255,255,.06); border-radius: 12px; min-height: 22px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 /* 레이어 */
 .layer { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
 
-/* 토스트 */
+/* 토스트 — 기본 1줄(말줄임), multi면 여러 줄 허용 */
 .toast {
-  position: relative; margin: 8px auto; max-width: 80%; width: fit-content;
+  position: relative; margin: 8px auto; max-width: 92vw; width: fit-content;
   background: rgba(20,12,40,.95); color: #fff; padding: 10px 16px; border-radius: 12px;
   font-weight: 600; box-shadow: var(--shadow); opacity: 0; transform: translateY(-10px);
   transition: opacity .25s ease, transform .25s ease; border: 1px solid rgba(255,255,255,.12);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 92vw;
 }
+.toast.toast-multi { white-space: normal; max-width: min(360px, 90vw); text-align: center; }
 #toast-layer { display: flex; flex-direction: column; align-items: center; padding-top: 70px; }
 .toast.show { opacity: 1; transform: translateY(0); }
 
@@ -138,4 +141,7 @@ body {
 @media (max-width: 640px) {
   .legend { display: none; }
   .title { font-size: 2.1rem; }
+  .banner { font-size: .84rem; padding: 8px 10px; margin: 6px 10px; }
+  .toast { font-size: .8rem; padding: 8px 12px; }
+  #toast-layer { padding-top: 60px; }
 }
