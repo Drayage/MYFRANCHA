@@ -16,8 +16,8 @@ export const ABILITIES = {
   daiso:    { name: '다없소',     icon: '🔁', desc: '라운드 시작 시 손패의 출원 1장을 소송뭉개기로 바꾼다.' },
   dunkin:   { name: '던진도너츠', icon: '🍩', desc: '소송뭉개기 대신 대상 카드의 효과를 그대로 복사해서 쓴다(원래 카드는 무효화되지 않고 정상 발동).' },
   toast:    { name: '아삭토스트', icon: '🛟', desc: '내 카드가 무효화되려는 순간, 무효 도장이 유효(초록)로 바뀌며 정상 발동한다.' },
-  bing:     { name: '덜빙',       icon: '🍧', desc: '형제 토큰 더빙이 추가되어 4개 모두 확보해야 승리한다.', ruleChange: true },
-  gimbap:   { name: '김밥전구',   icon: '⏳', desc: '라운드 중간에 상표를 모두 확보해도 즉시 승리하지 않는다. 라운드 종료 시점에 모두 갖고 있어야 승리한다.', ruleChange: true },
+  bing:     { name: '덜빙',       icon: '🍧', desc: '룰 변경: 이번 게임에서는 형제 토큰 더빙이 추가되어 4개 모두 확보해야 승리합니다.', ruleChange: true },
+  gimbap:   { name: '김밥전구',   icon: '⏳', desc: '룰 변경: 이번 게임에서는 라운드 중간에 상표를 모두 확보해도 즉시 승리하지 않습니다. 라운드 종료 시점에 모두 갖고 있어야 승리합니다.', ruleChange: true },
 };
 
 // 능력 모드가 켜졌고 해당 능력 토큰을 소유한 플레이어(아니면 null)

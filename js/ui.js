@@ -32,13 +32,18 @@ export function buildBoard(state) {
     // 능력 모드 ON이면 상표 우상단에 능력 마커 표시
     const info = state.abilitiesEnabled ? ABILITIES[tm.ability] : null;
     const marker = info
-      ? `<span class="tm-ability${info.ruleChange ? ' rule-change' : ''}" data-ability="${tm.ability}" title="${info.name}: ${info.desc}${info.ruleChange ? ' (룰 변경!)' : ''}">${info.icon}</span>`
+      ? `<span class="tm-ability${info.ruleChange ? ' rule-change' : ''}" data-ability="${tm.ability}" title="${info.name}: ${info.desc}">${info.icon}</span>`
       : '';
     el.innerHTML = `${marker}<span class="tm-emoji">${tm.emoji}</span><span class="tm-name">${tm.name}</span>`;
     // 능력 모드: 상표 클릭 시 능력을 카드형 말풍선으로 표시
+    // (대상 선택 중엔 document.body.dataset.selecting로 억제 — 선택과 팝업이 동시에 겹쳐서 가려지는 문제 방지)
     if (info) {
       el.style.cursor = 'pointer';
-      el.addEventListener('click', (e) => { e.stopPropagation(); showAbilityCard(tm, info, el); });
+      el.addEventListener('click', (e) => {
+        if (document.body.dataset.selecting) return;
+        e.stopPropagation();
+        showAbilityCard(tm, info, el);
+      });
     }
     $(`zone-${tm.owner}`).appendChild(el);
   }
@@ -53,9 +58,20 @@ export function showAbilityCard(tm, info, anchorEl) {
   card.innerHTML = `
     <div class="ac-head"><span class="ac-emoji">${tm.emoji}</span>
       <span class="ac-name">${tm.name}</span></div>
-    <div class="ac-badge">${info.icon} ${info.name} 능력</div>
+    <div class="ac-badge${info.ruleChange ? ' ac-badge-rule' : ''}">${info.icon} ${info.ruleChange ? '룰 변경' : `${info.name} 능력`}</div>
     <div class="ac-desc">${info.desc}</div>`;
   document.body.appendChild(card);
+  positionAbilityCard(card, anchorEl);
+  requestAnimationFrame(() => card.classList.add('show'));
+  abilityCardEl = card;
+  setTimeout(() => document.addEventListener('pointerdown', hideAbilityCard, { once: true }), 0);
+}
+function hideAbilityCard() {
+  if (abilityCardEl) { abilityCardEl.remove(); abilityCardEl = null; }
+}
+
+// ability-card류 팝업을 앵커 요소 기준으로 화면 안에 배치(위 우선, 공간 없으면 아래)
+function positionAbilityCard(card, anchorEl) {
   const r = anchorEl.getBoundingClientRect();
   const cw = card.offsetWidth, ch = card.offsetHeight;
   let left = Math.min(Math.max(8, r.left + r.width / 2 - cw / 2), window.innerWidth - cw - 8);
@@ -63,12 +79,6 @@ export function showAbilityCard(tm, info, anchorEl) {
   if (top < 8) top = Math.min(r.bottom + 12, window.innerHeight - ch - 8);
   card.style.left = `${left}px`;
   card.style.top = `${top}px`;
-  requestAnimationFrame(() => card.classList.add('show'));
-  abilityCardEl = card;
-  setTimeout(() => document.addEventListener('pointerdown', hideAbilityCard, { once: true }), 0);
-}
-function hideAbilityCard() {
-  if (abilityCardEl) { abilityCardEl.remove(); abilityCardEl = null; }
 }
 
 // 능력 발동 시 해당 상표 마커를 잠깐 강조
@@ -259,23 +269,75 @@ export function selectCards(state, player, count, { peekInfo = null } = {}) {
 export function selectTrademark(validTms, promptText) {
   return new Promise((resolve) => {
     setBanner(promptText);
+    document.body.dataset.selecting = '1'; // 능력 팝업과 선택이 동시에 겹치지 않게 억제
     const handlers = [];
+    const cleanup = () => {
+      delete document.body.dataset.selecting;
+      validTms.forEach((t) => document.querySelector(`[data-tm="${t.id}"]`)?.classList.remove('targetable'));
+      handlers.forEach(({ e, fn }) => e.removeEventListener('click', fn));
+    };
     validTms.forEach((tm) => {
       const el = document.querySelector(`[data-tm="${tm.id}"]`);
       if (!el) return;
       el.classList.add('targetable');
-      const h = () => {
-        validTms.forEach((t) => {
-          const e = document.querySelector(`[data-tm="${t.id}"]`);
-          e?.classList.remove('targetable');
-        });
-        handlers.forEach(({ e, fn }) => e.removeEventListener('click', fn));
-        resolve(tm);
+      const h = () => { cleanup(); resolve(tm); };
+      el.addEventListener('click', h);
+      handlers.push({ e: el, fn: h });
+    });
+  });
+}
+
+// ── 저명상표 주장: 클릭 → 능력 미리보기 카드 + "이걸로 선택" 확정 버튼 ──
+// (바로 선택되면 무슨 능력인지 모른 채 정하게 되므로, 확인 후 확정하는 2단계로 진행)
+export function selectRenownedClaim(trademarks, promptText) {
+  return new Promise((resolve) => {
+    setBanner(promptText);
+    document.body.dataset.selecting = '1';
+    const handlers = [];
+    const cleanup = () => {
+      delete document.body.dataset.selecting;
+      trademarks.forEach((t) => document.querySelector(`[data-tm="${t.id}"]`)?.classList.remove('targetable'));
+      handlers.forEach(({ e, fn }) => e.removeEventListener('click', fn));
+      hideAbilityCard();
+    };
+    trademarks.forEach((tm) => {
+      const el = document.querySelector(`[data-tm="${tm.id}"]`);
+      if (!el) return;
+      el.classList.add('targetable');
+      const info = ABILITIES[tm.ability];
+      const h = (e) => {
+        e.stopPropagation();
+        showRenownedPreview(tm, info, el, () => { cleanup(); resolve(tm); });
       };
       el.addEventListener('click', h);
       handlers.push({ e: el, fn: h });
     });
   });
+}
+
+// showAbilityCard와 비슷하지만 "이걸로 선택" 확정 버튼이 달린 변형.
+// 버튼 클릭으로만 닫히므로(전역 pointerdown 자동닫기 없음) 버튼 클릭이 안전하게 처리된다.
+function showRenownedPreview(tm, info, anchorEl, onConfirm) {
+  hideAbilityCard();
+  const card = document.createElement('div');
+  card.className = 'ability-card ability-card-confirm';
+  card.innerHTML = `
+    <div class="ac-head"><span class="ac-emoji">${tm.emoji}</span>
+      <span class="ac-name">${tm.name}</span></div>
+    <div class="ac-badge${info.ruleChange ? ' ac-badge-rule' : ''}">${info.icon} ${info.ruleChange ? '룰 변경' : `${info.name} 능력`}</div>
+    <div class="ac-desc">${info.desc}</div>
+    <button class="btn-primary ac-confirm">📜 이걸로 선택</button>`;
+  document.body.appendChild(card);
+  positionAbilityCard(card, anchorEl);
+  requestAnimationFrame(() => card.classList.add('show'));
+  card.querySelector('.ac-confirm').addEventListener('click', (e) => {
+    e.stopPropagation();
+    card.classList.remove('show');
+    setTimeout(() => card.remove(), 200);
+    if (abilityCardEl === card) abilityCardEl = null;
+    onConfirm();
+  });
+  abilityCardEl = card;
 }
 
 // ── 카드 공개 영역(세트 단위 동시 공개) ──
@@ -355,6 +417,18 @@ export function flipStampToSaved(player, slot) {
 export function markRevealUsed(player, slot) {
   document.querySelector(`#reveal-area .rcard[data-player="${player}"][data-slot="${slot}"]`)
     ?.classList.add('used');
+}
+
+// 던진도너츠: 소송뭉개기 카드가 공개되는 순간 아예 다른 카드(역고소카피)로 시각적으로 변형된다.
+export function transformRevealToDunkin(player, slot) {
+  const el = document.querySelector(`#reveal-area .rcard[data-player="${player}"][data-slot="${slot}"]`);
+  if (!el) return;
+  const emoji = el.querySelector('.rcard-emoji');
+  const name = el.querySelector('.rcard-name');
+  if (emoji) emoji.textContent = ABILITIES.dunkin.icon;
+  if (name) name.textContent = '역고소카피';
+  el.classList.add('dunkin-swap');
+  setTimeout(() => el.classList.remove('dunkin-swap'), reduced() ? 0 : 700);
 }
 
 export function highlightRevealCard(player, slot) {

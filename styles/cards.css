@@ -95,7 +95,7 @@
 }
 .rcard-front {
   transform: rotateY(180deg); background: linear-gradient(160deg, #fff, #e9e3ff);
-  color: #2a1850; border: 2px solid #fff;
+  color: #2a1850; border: 2px solid #fff; transition: border-color .3s ease;
 }
 .rcard-emoji { font-size: 1.5rem; }
 .rcard-name { font-size: .64rem; font-weight: 800; text-align: center; }
@@ -131,6 +131,10 @@
   font-size: .58rem; font-weight: 900; color: #2a1850; background: var(--gold);
   border-radius: 6px; padding: 1px 5px; z-index: 8; box-shadow: var(--shadow); pointer-events: none;
 }
+
+/* 던진도너츠: 소송뭉개기 카드가 공개되며 다른 카드(역고소카피)로 바뀌는 연출 */
+.rcard.dunkin-swap .rcard-front { border-color: #ff9635; }
+.rcard.dunkin-swap .rcard-inner { animation: dunkinSwapFlash .7s ease; }
 
 @media (prefers-reduced-motion: reduce) {
   .rcard-inner { transition: none; }

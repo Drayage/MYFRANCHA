@@ -23,12 +23,13 @@
 .zone-a-wrap { border-color: rgba(61,123,255,.35); }
 .zone-b-wrap { border-color: rgba(255,77,109,.35); }
 .zone-center-wrap { border-color: rgba(46,204,113,.35); }
-/* 라벨은 고정 높이 flex → 배지가 생겨도 상표 위치가 안 밀림 */
+/* 라벨은 고정 높이 flex → 배지가 생겨도 상표 위치가 안 밀림.
+   flex-wrap으로 공간이 부족하면 "상표 N"이 통째로 다음 줄로 내려가게(글자 단위로 안 쪼개지게). */
 .zone-label {
-  display: flex; align-items: center; gap: 5px; min-height: 30px;
-  font-weight: 800; margin-bottom: 6px; font-size: .95rem;
+  display: flex; align-items: center; gap: 5px; min-height: 30px; row-gap: 2px;
+  flex-wrap: wrap; font-weight: 800; margin-bottom: 6px; font-size: .95rem;
 }
-.zone-label .own { color: var(--gold); font-size: .82rem; margin-left: auto; }
+.zone-label .own { color: var(--gold); font-size: .82rem; margin-left: auto; white-space: nowrap; flex-shrink: 0; }
 /* 선플레이어 표시 배지(항상 자리 차지, 표시만 토글) */
 .first-badge {
   display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;

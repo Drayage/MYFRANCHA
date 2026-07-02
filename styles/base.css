@@ -88,7 +88,12 @@ body {
   display: inline-block; margin: 6px 0 4px; padding: 2px 8px; border-radius: 999px;
   background: #2a1850; color: #ffd76a; font-size: .74rem; font-weight: 800;
 }
+.ac-badge-rule { background: var(--b); color: #fff; }
 .ac-desc { font-size: .84rem; font-weight: 600; line-height: 1.35; }
+
+/* 확정 버튼이 달린 변형(저명상표 주장) — 클릭 가능해야 하므로 pointer-events 허용 */
+.ability-card-confirm { pointer-events: auto; text-align: center; }
+.ac-confirm { margin-top: 10px; padding: 8px 16px; font-size: .88rem; }
 
 /* 토스트 — 기본 1줄(말줄임), multi면 여러 줄 허용 */
 .toast {

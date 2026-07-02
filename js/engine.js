@@ -92,7 +92,7 @@ async function announceRuleChanges(state) {
   const ruleChangers = state.trademarks.filter((t) => t.ability && ab.ABILITIES[t.ability]?.ruleChange);
   for (const tm of ruleChangers) {
     const info = ab.ABILITIES[tm.ability];
-    ui.showToast(`⚠️ 룰 변경 상표 등장: ${tm.name} — ${info.desc}`, 3200, { multi: true });
+    ui.showToast(`⚠️ ${tm.name} 등장! ${info.desc}`, 3200, { multi: true });
     await sleep(700);
   }
 }
@@ -108,7 +108,7 @@ async function renownedClaimPhase(state) {
 
   let claimed;
   if (isHuman(state, claimant)) {
-    claimed = await ui.selectTrademark(state.trademarks, `${PLAYER_LABEL[claimant]} — 저명상표로 주장할 상표를 선택하세요`);
+    claimed = await ui.selectRenownedClaim(state.trademarks, `${PLAYER_LABEL[claimant]} — 상표를 클릭해 능력을 확인한 뒤 "이걸로 선택"을 누르세요`);
   } else {
     ui.setBanner(`🤖 ${PLAYER_LABEL[claimant]}(AI) — 저명상표 고르는 중…`);
     await sleep(500);
@@ -170,7 +170,9 @@ async function resolveSet(state, submissions, size, recorder) {
   await ui.flipRevealAll();
   await sleep(550);
 
-  // 2) 같은 턴 무효화 선계산. 던진도너츠 보유자의 소송뭉개기는 애초에 무효화하지 않음(카피로 대체).
+  // 2) 같은 턴 무효화 선계산 — 이 시점(카드 공개 직후)에 던진도너츠 보유 여부를 "확정"한다.
+  //    이후 처리 순서상 다른 카드가 먼저 처리되며 던진도너츠가 다른 사람 손에 넘어가도
+  //    이미 공개된 소송뭉개기는 그 결정을 그대로 유지한다(카드 자체가 바뀐 것으로 취급).
   //    아삭토스트 면역은 여기서 걸러내지 않고 항상 "무효" 도장을 먼저 찍는다 —
   //    실제 처리 시점(3)에 재확인해서 면역이면 무효→유효로 뒤집는 연출을 보여준다.
   for (let i = 0; i < size; i++) {
@@ -178,12 +180,16 @@ async function resolveSet(state, submissions, size, recorder) {
       const slot = slots[p][i];
       if (slot && slot.card.type === 'smother') {
         const victim = slots[opponentOf(p)][i];
-        const isDunkin = ab.dunkinHolder(state) === p;
-        if (victim && !isDunkin) {
-          victim.nullified = true;
-          ui.markRevealNullified(opponentOf(p), i);
+        slot.dunkinCopy = ab.dunkinHolder(state) === p; // 카드 공개 시점에 고정
+        if (slot.dunkinCopy) {
+          ui.transformRevealToDunkin(p, i); // 소송뭉개기가 던진도너츠 카드로 시각적으로 변형(효과는 자기 턴에 실행)
+        } else {
+          if (victim) {
+            victim.nullified = true;
+            ui.markRevealNullified(opponentOf(p), i);
+          }
+          ui.markRevealUsed(p, i);
         }
-        ui.markRevealUsed(p, i);
       }
     }
   }
@@ -230,17 +236,21 @@ async function resolveCard(state, player, slot, slots, idx, recorder) {
     }
   }
 
-  // 소송뭉개기: 던진도너츠 보유자면 무효화 대신 상대의 같은 턴 카드 효과를 그대로 복사해서 쓴다
-  // (상대 카드는 무효화되지 않고 자기 턴에 정상 발동). 아니면 일반 무효화 연출(실효는 이미 (2)에서 적용됨).
+  // 소송뭉개기: 던진도너츠 여부는 카드 공개 시점(2)에 이미 확정됐다(slot.dunkinCopy) —
+  // 중간에 던진도너츠 소유가 바뀌어도 이 카드의 정체성은 그대로 유지된다.
   if (card.type === 'smother') {
     const co = slots[opp][idx];
-    const isDunkin = ab.dunkinHolder(state) === player;
-    if (isDunkin && co && MOVE_TYPES.includes(co.card.type)) {
-      ui.flashAbility('dunkin');
-      ui.showToast(`🍩 던진도너츠 역고소 카피: ${co.card.name} 효과 복사! (상대 카드는 무효화되지 않음)`, 2400, { multi: true });
-      await theater.say(state, { cardType: 'smother', actor: player, victim: opp });
-      await sleep(300);
-      return performMove(state, player, co.card, recorder);
+    if (slot.dunkinCopy) {
+      if (co && MOVE_TYPES.includes(co.card.type)) {
+        ui.flashAbility('dunkin');
+        ui.showToast(`🍩 던진도너츠 역고소 카피: ${co.card.name} 효과 복사! (상대 카드는 무효화되지 않음)`, 2400, { multi: true });
+        await theater.say(state, { cardType: 'smother', actor: player, victim: opp });
+        await sleep(300);
+        return performMove(state, player, co.card, recorder);
+      }
+      ui.showToast(`🍩 던진도너츠: 복사할 상대 카드가 없어 불발`);
+      await sleep(400);
+      return null;
     }
     recorder.add({ kind: 'nullify', round: state.round, actor: player, victim: opp });
     ui.showToast(`🚫 ${PLAYER_LABEL[player]} 소송뭉개기: ${PLAYER_LABEL[opp]} 같은 턴 무효`, 2000);
