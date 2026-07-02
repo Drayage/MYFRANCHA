@@ -292,6 +292,8 @@ export function selectTrademark(validTms, promptText) {
 
 // ── 저명상표 주장: 클릭 → 능력 미리보기 카드 + "이걸로 선택" 확정 버튼 ──
 // (바로 선택되면 무슨 능력인지 모른 채 정하게 되므로, 확인 후 확정하는 2단계로 진행)
+// 미리보기는 보드 위에 앵커로 띄우지 않고 화면 중앙 딤 배경 모달로 표시 —
+// 어느 상표를 고르든 다른 상표 토큰을 가리지 않고, 배경을 누르면 취소하고 다시 고를 수 있다.
 export function selectRenownedClaim(trademarks, promptText) {
   return new Promise((resolve) => {
     setBanner(promptText);
@@ -301,7 +303,7 @@ export function selectRenownedClaim(trademarks, promptText) {
       delete document.body.dataset.selecting;
       trademarks.forEach((t) => document.querySelector(`[data-tm="${t.id}"]`)?.classList.remove('targetable'));
       handlers.forEach(({ e, fn }) => e.removeEventListener('click', fn));
-      hideAbilityCard();
+      hideRenownedPreview();
     };
     trademarks.forEach((tm) => {
       const el = document.querySelector(`[data-tm="${tm.id}"]`);
@@ -310,7 +312,7 @@ export function selectRenownedClaim(trademarks, promptText) {
       const info = ABILITIES[tm.ability];
       const h = (e) => {
         e.stopPropagation();
-        showRenownedPreview(tm, info, el, () => { cleanup(); resolve(tm); });
+        showRenownedPreview(tm, info, () => { cleanup(); resolve(tm); });
       };
       el.addEventListener('click', h);
       handlers.push({ e: el, fn: h });
@@ -318,29 +320,38 @@ export function selectRenownedClaim(trademarks, promptText) {
   });
 }
 
-// showAbilityCard와 비슷하지만 "이걸로 선택" 확정 버튼이 달린 변형.
-// 버튼 클릭으로만 닫히므로(전역 pointerdown 자동닫기 없음) 버튼 클릭이 안전하게 처리된다.
-function showRenownedPreview(tm, info, anchorEl, onConfirm) {
-  hideAbilityCard();
-  const card = document.createElement('div');
-  card.className = 'ability-card ability-card-confirm';
-  card.innerHTML = `
-    <div class="ac-head"><span class="ac-emoji">${tm.emoji}</span>
-      <span class="ac-name">${tm.name}</span></div>
-    <div class="ac-badge${info.ruleChange ? ' ac-badge-rule' : ''}">${info.icon} ${info.ruleChange ? '룰 변경' : `${info.name} 능력`}</div>
-    <div class="ac-desc">${info.desc}</div>
-    <button class="btn-primary ac-confirm">📜 이걸로 선택</button>`;
-  document.body.appendChild(card);
-  positionAbilityCard(card, anchorEl);
-  requestAnimationFrame(() => card.classList.add('show'));
-  card.querySelector('.ac-confirm').addEventListener('click', (e) => {
+// 화면 중앙 딤 배경 모달 변형: 배경(딤 영역) 클릭 시 취소하고 다시 고를 수 있게 닫힘,
+// "이걸로 선택" 버튼 클릭 시에만 확정된다.
+let renownedPreviewEl = null;
+function hideRenownedPreview() {
+  if (renownedPreviewEl) { renownedPreviewEl.remove(); renownedPreviewEl = null; }
+}
+function showRenownedPreview(tm, info, onConfirm) {
+  hideRenownedPreview();
+  const backdrop = document.createElement('div');
+  backdrop.className = 'rc-preview-backdrop';
+  backdrop.innerHTML = `
+    <div class="ability-card ability-card-confirm rc-preview-card">
+      <div class="ac-head"><span class="ac-emoji">${tm.emoji}</span>
+        <span class="ac-name">${tm.name}</span></div>
+      <div class="ac-badge${info.ruleChange ? ' ac-badge-rule' : ''}">${info.icon} ${info.ruleChange ? '룰 변경' : `${info.name} 능력`}</div>
+      <div class="ac-desc">${info.desc}</div>
+      <button class="btn-primary ac-confirm">📜 이걸로 선택</button>
+    </div>`;
+  document.body.appendChild(backdrop);
+  requestAnimationFrame(() => {
+    backdrop.classList.add('show');
+    backdrop.querySelector('.rc-preview-card').classList.add('show');
+  });
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) hideRenownedPreview(); // 딤 배경 클릭 = 설명 닫기(다시 고를 수 있음)
+  });
+  backdrop.querySelector('.ac-confirm').addEventListener('click', (e) => {
     e.stopPropagation();
-    card.classList.remove('show');
-    setTimeout(() => card.remove(), 200);
-    if (abilityCardEl === card) abilityCardEl = null;
+    hideRenownedPreview();
     onConfirm();
   });
-  abilityCardEl = card;
+  renownedPreviewEl = backdrop;
 }
 
 // ── 카드 공개 영역(세트 단위 동시 공개) ──

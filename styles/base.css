@@ -97,6 +97,17 @@ body {
 .ability-card-confirm { pointer-events: auto; text-align: center; }
 .ac-confirm { margin-top: 10px; padding: 8px 16px; font-size: .88rem; }
 
+/* 저명상표 미리보기: 화면 중앙 딤 배경 모달 — 앵커 위치와 무관하게 다른 상표를 가리지 않음.
+   딤 배경 클릭 시 취소하고 다시 고를 수 있도록 닫힘. */
+.rc-preview-backdrop {
+  position: fixed; inset: 0; z-index: 76; background: rgba(8,4,20,.55);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  opacity: 0; transition: opacity .18s ease;
+}
+.rc-preview-backdrop.show { opacity: 1; }
+.rc-preview-card { position: relative; margin: 0; }
+.rc-preview-card::after { display: none; }
+
 /* 토스트 — 기본 1줄(말줄임), multi면 여러 줄 허용 */
 .toast {
   position: relative; margin: 8px auto; max-width: 92vw; width: fit-content;
