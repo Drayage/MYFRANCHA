@@ -10,6 +10,7 @@ import * as ai from './ai.js';
 import * as ui from './ui.js';
 import * as theater from './theater.js';
 import { move, sleep } from './animation.js';
+import { sfx } from './audio.js';
 
 const isHuman = (state, player) => state.mode === 'local' || player === state.humanSide;
 const describe = (cards) => cards.map((c) => c.name).join(', ');
@@ -187,6 +188,7 @@ async function resolveSet(state, submissions, size, recorder) {
           if (victim) {
             victim.nullified = true;
             ui.markRevealNullified(opponentOf(p), i);
+            sfx('nullify');
           }
           ui.markRevealUsed(p, i);
         }
@@ -210,6 +212,7 @@ async function resolveSet(state, submissions, size, recorder) {
       recorder.add({ kind: 'round-token', round: state.round, actor: tokGot });
       state.log.push({ kind: 'round-token', actor: tokGot, round: state.round });
       ui.showToast(`🏁 ${PLAYER_LABEL[tokGot]} 라운드 토큰 획득!`, 2200);
+      sfx('token');
       await sleep(400);
     }
   }
@@ -306,6 +309,7 @@ async function performMove(state, player, card, recorder) {
 
   const collision = fromOwner === opp; // 상대 상표를 뺏김/리셋 = 충돌 연출
   await theater.say(state, { cardType: card.type, actor: player, victim: opp });
+  sfx(collision ? 'collision' : 'move');
   await move(target.id, toOwner, { collision });
   applyMove(state, target.id, toOwner);
 
@@ -322,7 +326,14 @@ async function performMove(state, player, card, recorder) {
 }
 
 function endGame(state, recorder, result) {
-  ui.setBanner(result.winner ? `🏆 ${PLAYER_LABEL[result.winner]} 승리!` : '🤝 무승부');
+  if (!result.winner) {
+    ui.setBanner('🤝 무승부');
+  } else if (state.mode === 'ai') {
+    const won = result.winner === state.humanSide;
+    ui.setBanner(won ? '🎉 승리했습니다!' : '😢 패배했습니다…');
+  } else {
+    ui.setBanner(`🏆 ${PLAYER_LABEL[result.winner]} 승리!`);
+  }
   return result;
 }
 

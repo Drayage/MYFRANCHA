@@ -8,8 +8,12 @@
 흔들림 애니메이션으로 표현됩니다.
 
 ## 🎮 플레이 모드
-- 🤖 **AI 대전** — 휴리스틱 AI(을)와 대결
-- 👥 **로컬 패스앤플레이** — 한 기기에서 번갈아(가림막 화면 제공)
+- 🤖 **AI 대전** — 휴리스틱 AI와 대결(진영은 매판 랜덤 배정). 게임 종료 시 갑/을이 아니라
+  **"승리했습니다! / 패배했습니다…"** 로 내 기준 결과를 보여줍니다.
+- 👥 **로컬 패스앤플레이** — 한 기기에서 번갈아(가림막 화면 제공). 둘 다 실제 플레이어라
+  결과는 그대로 "갑(A)/을(B) 승리"로 표시됩니다.
+- 🌐 **온라인 대전 (준비중)** — Firebase Realtime DB 연동 자리(아래 "온라인 대전 준비" 참고).
+  실제 키가 없으면 버튼 클릭 시 안내 모달만 뜹니다.
 
 ## ✨ 옵션 (시작 화면 토글)
 - 📖 **튜토리얼 켜기** — 켜면 게임 시작 시 코치마크 가이드 노출(기본 꺼짐)
@@ -42,6 +46,10 @@
   결과를 순차 처리. 소송뭉개기는 **같은 턴 상대 카드**를 자동 무효화("무효" 스탬프).
 - 📖 **초보자 온보딩** — 튜토리얼 코치마크, 카드 툴팁, 유효 대상 하이라이트, 단계 배너, 규칙 도움말
 - ▶ **리플레이** — 한 판의 모든 이동을 애니메이션과 함께 재생(재생/일시정지/스텝/속도)
+- 🔊 **배경음/효과음** — Web Audio API로 그 자리에서 생성하는 마림바풍 BGM 루프 +
+  카드 선택/제출/공개/이동/충돌/무효화/토큰 획득/능력 발동/승패 효과음(외부 오디오 파일 없음,
+  완전 오프라인 동작). 시작 화면·게임 화면의 🔊 버튼으로 언제든 끄고 켤 수 있고,
+  설정은 `localStorage`에 저장됩니다.
 
 ## 📐 규칙 요약
 - **승리**: 상표 3개 모두 소유 시 즉시 승리. 5라운드 종료 시 상표가 더 많은 쪽 승리
@@ -70,10 +78,16 @@ python3 -m http.server 8000
 - PWA (manifest + service worker)
 - GitHub Pages 배포
 
-## 🗺 다음 단계 (이번 버전 범위 외)
-- 🌐 **Firebase Realtime DB 온라인 실시간 대전** — `room { players, table, turnState, round, log }`
-  구조 기반. 현재 버전은 오프라인(AI·로컬) 우선으로 구현되었으며 온라인 동기화 코드는 아직
-  포함하지 않습니다.
+## 🌐 온라인 대전 준비 (Firebase)
+실제 대전 매칭은 아직 연결 전이지만, 키만 넣으면 바로 이어갈 수 있도록 자리를 만들어 뒀습니다.
+1. `js/firebase-config.js`의 `FIREBASE_CONFIG`에 Firebase 콘솔에서 발급한 실제 값을 채웁니다
+   (apiKey가 플레이스홀더 그대로면 온라인 모드는 계속 "준비중" 안내만 표시됩니다).
+2. Realtime Database를 활성화하고, `js/online.js` 상단 주석의 예시 규칙을 참고해 보안 규칙을
+   설정합니다.
+3. `js/online.js`는 `room { players, table, turnState, round, log }` 구조로
+   `createRoom` / `joinRoom` / `subscribeRoom` / `pushRoomUpdate` 헬퍼(Firebase SDK를 CDN에서
+   동적 로드)를 이미 제공합니다 — 실제 로비 UI와 `engine.js` 동기화는 다음 단계에서 이어서
+   구현하면 됩니다.
 
 ## 📁 구조
 ```
@@ -82,5 +96,6 @@ manifest.webmanifest · service-worker.js
 styles/  base · board · cards · animations
 js/      config · state · cards · abilities · animation · theater
          replay · ai · ui · onboarding · engine · main
+         audio · online · firebase-config
 assets/  icon-192.png · icon-512.png
 ```

@@ -3,6 +3,7 @@ import { TOTAL_ROUNDS, PLAYER_LABEL, OWNER } from './config.js';
 import { countOwned } from './state.js';
 import { CARD_BEHAVIOR } from './cards.js';
 import { ABILITIES, cardAbilityIcons } from './abilities.js';
+import { sfx } from './audio.js';
 
 const cardLabel = (card) => card.display || card.name;
 
@@ -83,6 +84,7 @@ function positionAbilityCard(card, anchorEl) {
 
 // 능력 발동 시 해당 상표 마커를 잠깐 강조
 export function flashAbility(abilityId) {
+  sfx(abilityId === 'pig' ? 'shield' : 'ability');
   const m = document.querySelector(`.tm-ability[data-ability="${abilityId}"]`);
   if (!m) return;
   m.classList.add('ability-active');
@@ -240,8 +242,8 @@ export function selectCards(state, player, count, { peekInfo = null } = {}) {
       c.onmouseleave = clearPreview;
       c.onclick = () => {
         const i = orderSel.indexOf(card.uid);
-        if (i >= 0) orderSel.splice(i, 1);
-        else if (orderSel.length < count) orderSel.push(card.uid);
+        if (i >= 0) { orderSel.splice(i, 1); sfx('deselect'); }
+        else if (orderSel.length < count) { orderSel.push(card.uid); sfx('select'); }
         renderBadges();
         // 다시 눌러 취소하면 영역 강조도 사라지게
         if (orderSel.includes(card.uid)) showPreview(card);
@@ -253,6 +255,7 @@ export function selectCards(state, player, count, { peekInfo = null } = {}) {
 
     const btn = $('submit-cards');
     btn.onclick = () => {
+      sfx('submit');
       // 선택 순서대로 반환 → 제출 슬롯(턴) 순서가 됨
       const chosen = orderSel.map((uid) => hand.find((c) => c.uid === uid));
       clearPreview();
@@ -389,7 +392,7 @@ export function flipRevealAll() {
   return new Promise((resolve) => {
     const cards = [...document.querySelectorAll('#reveal-area .rcard')];
     const stagger = reduced() ? 0 : 170;
-    cards.forEach((c, i) => setTimeout(() => c.classList.add('flipped'), i * stagger));
+    cards.forEach((c, i) => setTimeout(() => { c.classList.add('flipped'); sfx('flip'); }, i * stagger));
     const total = reduced() ? 0 : (cards.length - 1) * stagger + 700;
     setTimeout(resolve, total);
   });
@@ -527,18 +530,30 @@ export function showRoundEnd(state) {
 
 export function showGameOver(state, result, { onReplay, onHome }) {
   const reasonText = {
-    instant: '상표 3개를 모두 차지했습니다!',
+    instant: `상표 ${state.trademarks.length}개를 모두 차지했습니다!`,
     trademarks: '더 많은 상표를 차지했습니다.',
     tokens: '상표 동점 — 라운드 토큰이 더 많습니다.',
     'last-token': '완전 동점 — 마지막 라운드 토큰 보유로 승리.',
     draw: '완전 무승부!',
   }[result.reason] || '';
-  const winLine = result.winner
-    ? `🏆 ${PLAYER_LABEL[result.winner]}(${result.winner}) 승리!`
-    : '🤝 무승부';
+
+  // AI 대전은 "갑/을" 대신 내가 이겼는지/졌는지로 표시(진영은 매판 랜덤 배정되므로).
+  // 로컬 패스앤플레이는 둘 다 실제 플레이어라 그대로 갑/을로 표시.
+  let winLine, subLine = '';
+  if (!result.winner) {
+    winLine = '🤝 무승부';
+  } else if (state.mode === 'ai') {
+    const won = result.winner === state.humanSide;
+    winLine = won ? '🎉 승리했습니다!' : '😢 패배했습니다…';
+    subLine = `<p class="sub-result">나는 ${PLAYER_LABEL[state.humanSide]}(${state.humanSide}) · 승자는 ${PLAYER_LABEL[result.winner]}(${result.winner})</p>`;
+  } else {
+    winLine = `🏆 ${PLAYER_LABEL[result.winner]}(${result.winner}) 승리!`;
+  }
+
   openModal(`
     <h3>게임 종료</h3>
     <p class="big-win">${winLine}</p>
+    ${subLine}
     <p>${reasonText}</p>
     <p>최종 상표 — ${PLAYER_LABEL.A}: ${countOwned(state, 'A')} · ${PLAYER_LABEL.B}: ${countOwned(state, 'B')}</p>
     <div class="modal-choices">

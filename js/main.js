@@ -4,9 +4,15 @@ import { runGame } from './engine.js';
 import * as ui from './ui.js';
 import { showHelp, showCoachmarks } from './onboarding.js';
 import { createRecorder, saveReplay, loadReplay, hasReplay, play as playReplay } from './replay.js';
+import * as audio from './audio.js';
+import { isOnlineConfigured, showOnlineComingSoon } from './online.js';
 
 const $ = (id) => document.getElementById(id);
 const show = (id) => { $('screen-start').classList.toggle('hidden', id !== 'start'); $('screen-game').classList.toggle('hidden', id !== 'game'); };
+
+function withClickSfx(el, fn) {
+  el.onclick = () => { audio.sfx('button'); fn(); };
+}
 
 function readOptions() {
   return {
@@ -31,11 +37,20 @@ async function startGame(mode) {
   const result = await runGame(state, recorder);
   saveReplay(recorder, result);
   refreshReplayButton();
+  const outcome = personalizedOutcome(state, result);
+  audio.sfx(outcome === 'win' ? 'win' : outcome === 'lose' ? 'lose' : 'round');
 
   ui.showGameOver(state, result, {
     onReplay: () => runReplay(loadReplay()),
     onHome: () => goHome(),
   });
+}
+
+// AI 대전은 내(humanSide) 기준 승/패, 로컬은 승자가 있으면 그냥 축하 사운드
+function personalizedOutcome(state, result) {
+  if (!result.winner) return 'draw';
+  if (state.mode === 'ai') return result.winner === state.humanSide ? 'win' : 'lose';
+  return 'win';
 }
 
 async function runReplay(recording) {
@@ -68,15 +83,36 @@ function refreshReplayButton() {
   $('btn-replay-last').classList.toggle('hidden', !hasReplay());
 }
 
+function syncMuteButtons() {
+  const on = audio.isBgmEnabled() || audio.isSfxEnabled();
+  const icon = on ? '🔊' : '🔇';
+  $('btn-mute').textContent = icon;
+  $('btn-mute-game').textContent = icon;
+}
+function toggleMute() {
+  const on = !(audio.isBgmEnabled() || audio.isSfxEnabled());
+  audio.setBgmEnabled(on);
+  audio.setSfxEnabled(on);
+  syncMuteButtons();
+  if (on) audio.sfx('button');
+}
+
 function init() {
-  $('btn-ai').onclick = () => startGame('ai');
-  $('btn-local').onclick = () => startGame('local');
-  $('btn-help').onclick = showHelp;
-  $('btn-help-game').onclick = showHelp;
-  $('btn-coach').onclick = () => showCoachmarks();
-  $('btn-home').onclick = goHome;
-  $('btn-replay-last').onclick = () => runReplay(loadReplay());
+  withClickSfx($('btn-ai'), () => startGame('ai'));
+  withClickSfx($('btn-local'), () => startGame('local'));
+  withClickSfx($('btn-online'), () => showOnlineComingSoon());
+  withClickSfx($('btn-help'), showHelp);
+  withClickSfx($('btn-help-game'), showHelp);
+  withClickSfx($('btn-coach'), () => showCoachmarks());
+  withClickSfx($('btn-home'), goHome);
+  withClickSfx($('btn-replay-last'), () => runReplay(loadReplay()));
+  $('btn-mute').onclick = toggleMute;
+  $('btn-mute-game').onclick = toggleMute;
+  syncMuteButtons();
   refreshReplayButton();
+  $('btn-online').classList.toggle('hidden', false); // 항상 노출(클릭 시 안내), 준비되면 isOnlineConfigured()로 분기 가능
+
+  audio.startBgm();
 
   // PWA 서비스워커 등록
   if ('serviceWorker' in navigator) {

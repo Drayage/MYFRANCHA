@@ -35,7 +35,9 @@ body {
 .btn-secondary { background: #3a2c5e; color: var(--ink); }
 .btn-primary:hover, .btn-secondary:hover { transform: translateY(-2px); filter: brightness(1.08); }
 .btn-primary:disabled { opacity: .5; cursor: default; transform: none; filter: none; }
-.btn-primary.big { font-size: 1.1rem; padding: 16px 22px; }
+.btn-primary.big, .btn-secondary.big { font-size: 1.1rem; padding: 16px 22px; }
+.btn-secondary.big { opacity: .75; }
+.btn-secondary.big:hover { opacity: .95; }
 
 .icon-btn {
   width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer;
@@ -119,6 +121,7 @@ body {
 }
 .modal h3 { margin-top: 0; }
 .modal .big-win { font-size: 1.6rem; color: var(--gold); font-weight: 800; }
+.modal .sub-result { color: var(--muted); font-size: .85rem; margin-top: -8px; }
 .modal-choices { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
 .modal-choice { font: inherit; padding: 10px 14px; border-radius: 10px; border: none; cursor: pointer; background: #3a2c5e; color: var(--ink); font-weight: 700; }
 .modal-choice:hover { filter: brightness(1.2); }
