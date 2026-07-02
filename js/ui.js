@@ -79,6 +79,37 @@ export function flashAbility(abilityId) {
   setTimeout(() => m.classList.remove('ability-active'), 1600);
 }
 
+// 화남돼지집 보호막 뱃지(생성/소모)를 상표 토큰에 붙였다 뗐다
+export function setShieldVisible(tmId, visible) {
+  const token = document.querySelector(`.tm-token[data-tm="${tmId}"]`);
+  if (!token) return;
+  let badge = token.querySelector('.tm-shield');
+  if (visible && !badge) {
+    badge = document.createElement('span');
+    badge.className = 'tm-shield';
+    badge.textContent = '🛡️';
+    badge.title = '화남돼지집 보호막: 이 상표가 대상이 되는 것을 한 번 막는다.';
+    token.appendChild(badge);
+  } else if (!visible && badge) {
+    badge.remove();
+  }
+}
+
+// 저명상표 주장 리본(1R 1차 한정 표시, 사용 후 제거)
+export function setRenownedMark(tmId, visible) {
+  const token = document.querySelector(`.tm-token[data-tm="${tmId}"]`);
+  if (!token) return;
+  let ribbon = token.querySelector('.tm-renowned');
+  if (visible && !ribbon) {
+    ribbon = document.createElement('span');
+    ribbon.className = 'tm-renowned';
+    ribbon.textContent = '📜 저명상표';
+    token.appendChild(ribbon);
+  } else if (!visible && ribbon) {
+    ribbon.remove();
+  }
+}
+
 // 리플레이용: 모든 토큰을 중앙으로 즉시 복귀
 export function resetTokensToCenter(state) {
   for (const tm of state.trademarks) {
@@ -307,6 +338,19 @@ export function markRevealNullified(player, slot) {
     ?.classList.add('nullified');
 }
 
+// 아삭토스트: "무효" 도장이 실제 처리 시점에 "유효"(초록)로 뒤집히는 연출
+export function flipStampToSaved(player, slot) {
+  return new Promise((resolve) => {
+    const el = document.querySelector(`#reveal-area .rcard[data-player="${player}"][data-slot="${slot}"]`);
+    if (!el) { resolve(); return; }
+    const stamp = el.querySelector('.rcard-stamp');
+    el.classList.remove('nullified');
+    if (stamp) stamp.textContent = '유효';
+    requestAnimationFrame(() => el.classList.add('saved'));
+    setTimeout(resolve, reduced() ? 0 : 500);
+  });
+}
+
 // 소송뭉개기처럼 이미 효과가 적용된 카드를 "사용됨"으로 표시
 export function markRevealUsed(player, slot) {
   document.querySelector(`#reveal-area .rcard[data-player="${player}"][data-slot="${slot}"]`)
@@ -323,6 +367,58 @@ export function clearRevealArea() {
   const area = $('reveal-area');
   area.classList.remove('show');
   area.innerHTML = '';
+}
+
+// ── 맹한커피 복불복: 뒷면 카드 2장 중 1장을 골라 성공/실패를 뒤집어 확인(양쪽 모두 관전) ──
+// attacker/defender: 'A'|'B'. humanPicks: 공격자가 사람이면 직접 클릭, 아니면 AI가 자동 선택.
+// resolve(true)=공격 무효(막힘), resolve(false)=공격 성공(통과).
+export function playCoffeeGamble(attacker, defender, humanPicks) {
+  return new Promise((resolve) => {
+    const successSlot = Math.random() < 0.5 ? 0 : 1; // "성공"(공격 관통) 카드가 놓인 자리
+    const overlay = document.createElement('div');
+    overlay.className = 'gamble-overlay';
+    overlay.innerHTML = `
+      <div class="gamble-box">
+        <div class="gamble-title">🪙 맹한커피 복불복!</div>
+        <div class="gamble-sub" id="gamble-sub">${PLAYER_LABEL[attacker]}가 카드를 고르는 중…</div>
+        <div class="gamble-cards">
+          <button class="gcard" data-i="0" ${humanPicks ? '' : 'disabled'}>
+            <span class="gcard-inner"><span class="gcard-face gcard-back">?</span><span class="gcard-face gcard-front"></span></span>
+          </button>
+          <button class="gcard" data-i="1" ${humanPicks ? '' : 'disabled'}>
+            <span class="gcard-inner"><span class="gcard-face gcard-back">?</span><span class="gcard-face gcard-front"></span></span>
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('show'));
+
+    const finish = (pickedIdx) => {
+      const blocked = pickedIdx !== successSlot;
+      overlay.querySelectorAll('.gcard').forEach((btn, i) => {
+        btn.disabled = true;
+        const front = btn.querySelector('.gcard-front');
+        front.textContent = i === successSlot ? '✅ 성공' : '❌ 실패';
+        front.classList.add(i === successSlot ? 'gcard-success' : 'gcard-fail');
+        btn.querySelector('.gcard-inner').classList.add('flipped');
+      });
+      $('gamble-sub').textContent = blocked
+        ? `${PLAYER_LABEL[defender]} 방어 성공! 공격 무효.`
+        : `${PLAYER_LABEL[attacker]} 공격 관통!`;
+      setTimeout(() => {
+        overlay.classList.remove('show');
+        setTimeout(() => { overlay.remove(); resolve(blocked); }, 300);
+      }, 1300);
+    };
+
+    if (humanPicks) {
+      overlay.querySelectorAll('.gcard').forEach((btn) => {
+        btn.addEventListener('click', () => finish(parseInt(btn.dataset.i)), { once: true });
+      });
+    } else {
+      setTimeout(() => finish(Math.random() < 0.5 ? 0 : 1), 700);
+    }
+  });
 }
 
 // ── 범용 모달 ──

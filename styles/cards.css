@@ -112,10 +112,17 @@
   position: absolute; top: 24px; left: 50%; transform: translate(-50%, 0) rotate(-14deg) scale(0);
   color: var(--b); font-weight: 900; font-size: 1rem; border: 3px solid var(--b);
   border-radius: 8px; padding: 2px 6px; background: rgba(255,255,255,.9); pointer-events: none;
-  transition: transform .25s ease;
+  transition: transform .3s cubic-bezier(.34,1.56,.64,1), border-color .2s ease, color .2s ease;
 }
 .rcard.nullified .rcard-stamp { transform: translate(-50%, 0) rotate(-14deg) scale(1); }
 .rcard.nullified .rcard-front { filter: grayscale(.7) brightness(.85); }
+
+/* 아삭토스트: 무효 도장이 실제 처리 시점에 "유효"(초록)로 뒤집힘 — 원카드는 정상 발동 */
+.rcard.saved .rcard-stamp {
+  transform: translate(-50%, 0) rotate(-14deg) scale(1);
+  border-color: #22c55e; color: #16a34a;
+}
+.rcard.saved .rcard-inner { animation: savedFlash .6s ease; }
 
 /* 소송뭉개기: 이미 사용된 카드 표시(살짝 흐리게 + "사용" 도장) */
 .rcard.used .rcard-front { filter: grayscale(.35) brightness(.92); opacity: .9; }

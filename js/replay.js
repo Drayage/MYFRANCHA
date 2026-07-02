@@ -7,7 +7,7 @@ const STORE_KEY = 'francha.lastReplay';
 // 기록기: 게임 진행 중 의미 이벤트를 모은다.
 export function createRecorder(meta) {
   return {
-    meta,                 // { abilitiesEnabled, theaterEnabled, mode }
+    meta,                 // { abilitiesEnabled, theaterEnabled, mode, trademarks }
     events: [],           // 순차 이벤트
     add(ev) { this.events.push(ev); },
   };

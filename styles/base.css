@@ -146,6 +146,47 @@ body {
 .coach-count { margin-right: auto; color: var(--muted); font-size: .82rem; }
 .coach-actions .btn-primary, .coach-actions .btn-secondary { padding: 7px 12px; font-size: .85rem; }
 
+/* 맹한커피 복불복 미니게임 오버레이 */
+.gamble-overlay {
+  position: fixed; inset: 0; z-index: 88; background: rgba(8,4,20,.72);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity .2s ease; padding: 20px;
+}
+.gamble-overlay.show { opacity: 1; }
+.gamble-box {
+  background: var(--panel); border-radius: 20px; padding: 26px 22px; text-align: center;
+  box-shadow: var(--shadow); border: 2px solid var(--gold);
+}
+.gamble-title { font-size: 1.3rem; font-weight: 900; margin-bottom: 4px; }
+.gamble-sub { color: var(--muted); font-weight: 700; margin-bottom: 18px; min-height: 20px; }
+.gamble-cards { display: flex; gap: 18px; justify-content: center; }
+.gcard {
+  width: 96px; height: 128px; border: none; background: none; cursor: pointer; padding: 0;
+  perspective: 600px;
+}
+.gcard:disabled { cursor: default; }
+.gcard-inner {
+  position: relative; display: block; width: 100%; height: 100%;
+  transform-style: preserve-3d; transition: transform .5s ease;
+}
+.gcard-inner.flipped { transform: rotateY(180deg); }
+.gcard-face {
+  position: absolute; inset: 0; backface-visibility: hidden; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900; box-shadow: var(--shadow);
+}
+.gcard-back {
+  background: linear-gradient(160deg, #4a3680, #2c1d52); color: #ffcf4d;
+  font-size: 2.2rem; border: 3px solid rgba(255,255,255,.25);
+}
+.gcard:not(:disabled) .gcard-back:hover { filter: brightness(1.2); }
+.gcard-front {
+  transform: rotateY(180deg); background: linear-gradient(160deg, #fff, #e9e3ff);
+  color: #2a1850; border: 3px solid #fff; font-size: 1.1rem;
+}
+.gcard-front.gcard-success { background: linear-gradient(160deg, #d6ffe6, #a9f5c4); border-color: #22c55e; }
+.gcard-front.gcard-fail { background: linear-gradient(160deg, #ffe0e6, #ffc2cd); border-color: var(--b); }
+
 /* 리플레이 컨트롤 바 */
 #replay-bar {
   position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);

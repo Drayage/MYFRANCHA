@@ -96,6 +96,22 @@
   background: var(--gold); color: #2a1850; border-style: dashed; border-color: var(--b);
 }
 
+/* 화남돼지집 보호막 뱃지(라운드 시작마다 생성, 대상 지정 1회 막으면 소모) */
+.tm-shield {
+  position: absolute; bottom: -9px; left: -9px; width: 26px; height: 26px;
+  border-radius: 50%; background: #16a34a; color: #fff; font-size: .9rem;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid #fff; box-shadow: var(--shadow); z-index: 6;
+  animation: shieldPulse 1.6s ease-in-out infinite;
+}
+
+/* 저명상표 주장 리본(1R 1차 한정) — 보호막 뱃지와 안 겹치게 더 아래쪽 */
+.tm-renowned {
+  position: absolute; bottom: -28px; left: 50%; transform: translateX(-50%);
+  white-space: nowrap; background: var(--gold); color: #2a1850; font-weight: 900;
+  font-size: .62rem; padding: 2px 8px; border-radius: 999px; box-shadow: var(--shadow); z-index: 6;
+}
+
 /* 선택 가능 상표 하이라이트 */
 .tm-token.targetable {
   cursor: pointer; animation: targetPulse 1.1s ease-in-out infinite;

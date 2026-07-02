@@ -32,6 +32,18 @@
   50% { transform: scale(1.35); box-shadow: 0 0 0 8px rgba(255,207,77,0); }
 }
 
+/* 화남돼지집 보호막 상시 은은한 펄스(생성~소모 전까지) */
+@keyframes shieldPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(22,163,74,.65); }
+  50% { box-shadow: 0 0 0 6px rgba(22,163,74,0); }
+}
+
+/* 아삭토스트: 무효→유효로 뒤집힐 때 카드 주변 초록 플래시 */
+@keyframes savedFlash {
+  0% { box-shadow: 0 0 0 0 rgba(34,197,94,.9); }
+  100% { box-shadow: 0 0 0 14px rgba(34,197,94,0); }
+}
+
 /* 룰 변경 능력 마커 — 상시 경고성 펄스로 눈에 띄게 */
 @keyframes ruleChangeGlow {
   0%, 100% { box-shadow: 0 0 0 0 rgba(255,77,109,.6), var(--shadow); }

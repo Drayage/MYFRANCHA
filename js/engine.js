@@ -1,7 +1,7 @@
 // engine.js — 라운드/페이즈 진행 상태기계 + 카드 해결 파이프라인 (+ 능력 훅)
 import { TOTAL_ROUNDS, SET_SIZES, PLAYER_LABEL, OWNER } from './config.js';
 import {
-  dealHand, opponentOf, applyMove, checkInstantWin,
+  dealHand, opponentOf, applyMove, checkInstantWin, checkFullOwnership,
   evaluateRoundToken, finalResult, countOwned,
 } from './state.js';
 import { CARD_BEHAVIOR } from './cards.js';
@@ -20,6 +20,9 @@ export async function runGame(state, recorder) {
   ui.buildBoard(state);
   ui.updateHUD(state);
 
+  await announceRuleChanges(state);
+  await renownedClaimPhase(state);
+
   for (let round = 1; round <= TOTAL_ROUNDS; round++) {
     state.round = round;
     state.roundSecuredTwo = null;
@@ -28,10 +31,14 @@ export async function runGame(state, recorder) {
 
     // 라운드 시작 능력(보호막/패 변환)
     const rs = ab.onRoundStart(state);
-    if (rs.shield) { ui.flashAbility('pig'); ui.showToast(`🛡️ 화남돼지집: ${PLAYER_LABEL[rs.shield]} 보호막 획득`); }
+    if (rs.shieldTmId) {
+      ui.flashAbility('pig');
+      ui.setShieldVisible(rs.shieldTmId, true);
+      ui.showToast('🛡️ 화남돼지집: 대상 지정 방지 보호막 생성!');
+    }
     if (rs.daiso) { ui.flashAbility('daiso'); ui.showToast(`🔁 다없소: ${PLAYER_LABEL[rs.daiso]} 출원→소송뭉개기`); }
     ui.updateHUD(state);
-    if (rs.shield || rs.daiso) await sleep(500);
+    if (rs.shieldTmId || rs.daiso) await sleep(500);
 
     for (let s = 0; s < SET_SIZES.length; s++) {
       state.setIndex = s;
@@ -42,6 +49,11 @@ export async function runGame(state, recorder) {
       const submissions = await collectSubmissions(state, size);
       const ended = await resolveSet(state, submissions, size, recorder);
       if (ended) { state.phase = 'game-over'; return endGame(state, recorder, { reason: 'instant', winner: state.winner }); }
+
+      // 저명상표 주장 표시는 1R 1차가 끝나면 제거(그 이후로는 효과 없음)
+      if (round === 1 && s === 0 && state.renownedClaim) {
+        ui.setRenownedMark(state.renownedClaim, false);
+      }
 
       // 세트 종료 → 선플레이어 토큰 교대(빨리바게뜨 보유자면 유지)
       if (!ab.keepsFirst(state)) {
@@ -56,6 +68,16 @@ export async function runGame(state, recorder) {
 
     state.phase = 'round-end';
     await ui.showRoundEnd(state);
+
+    // 김밥전구: 라운드 중엔 즉시승리 없이 진행하다가, 라운드 종료 시점에 전체 소유면 그때 승리 확정
+    if (state.noInstantWin) {
+      const w = checkFullOwnership(state);
+      if (w) {
+        state.winner = w;
+        state.phase = 'game-over';
+        return endGame(state, recorder, { reason: 'instant', winner: w });
+      }
+    }
   }
 
   // 5라운드 종료 판정
@@ -63,6 +85,39 @@ export async function runGame(state, recorder) {
   state.winner = result.winner;
   state.phase = 'game-over';
   return endGame(state, recorder, result);
+}
+
+// 룰을 바꾸는 능력이 이번 판 보드에 등장하면, 시작 전에 모두에게 알린다(모르고 당하면 안 되니까).
+async function announceRuleChanges(state) {
+  const ruleChangers = state.trademarks.filter((t) => t.ability && ab.ABILITIES[t.ability]?.ruleChange);
+  for (const tm of ruleChangers) {
+    const info = ab.ABILITIES[tm.ability];
+    ui.showToast(`⚠️ 룰 변경 상표 등장: ${tm.name} — ${info.desc}`, 3200, { multi: true });
+    await sleep(700);
+  }
+}
+
+// 저명상표 주장: 능력 모드에서 라운드1 시작 전, 후공(을)이 상표 1개를 지정 —
+// 갑은 1R 1차에서 그 상표를 출원으로 가져올 수 없다.
+async function renownedClaimPhase(state) {
+  if (!state.abilitiesEnabled) return;
+  const claimant = 'B';
+  ui.showToast('📜 저명상표 주장: 상대는 1라운드 1차에 그 상표를 출원할 수 없습니다!', 2800, { multi: true });
+  ui.setBanner(`${PLAYER_LABEL[claimant]} — 저명상표 주장: 상표 1개를 지정하세요`);
+  await sleep(500);
+
+  let claimed;
+  if (isHuman(state, claimant)) {
+    claimed = await ui.selectTrademark(state.trademarks, `${PLAYER_LABEL[claimant]} — 저명상표로 주장할 상표를 선택하세요`);
+  } else {
+    ui.setBanner(`🤖 ${PLAYER_LABEL[claimant]}(AI) — 저명상표 고르는 중…`);
+    await sleep(500);
+    claimed = state.trademarks[Math.floor(Math.random() * state.trademarks.length)];
+  }
+  state.renownedClaim = claimed.id;
+  ui.setRenownedMark(claimed.id, true);
+  ui.showToast(`📜 ${PLAYER_LABEL[claimant]}: "${claimed.name}"은(는) 저명상표! 갑은 1차에서 출원 불가`, 2800, { multi: true });
+  await sleep(700);
 }
 
 // ── 제출 수집 ──
@@ -115,13 +170,16 @@ async function resolveSet(state, submissions, size, recorder) {
   await ui.flipRevealAll();
   await sleep(550);
 
-  // 2) 같은 턴 무효화 선계산(면책이면 스킵). 소송뭉개기는 '사용됨' 표시.
+  // 2) 같은 턴 무효화 선계산. 던진도너츠 보유자의 소송뭉개기는 애초에 무효화하지 않음(카피로 대체).
+  //    아삭토스트 면역은 여기서 걸러내지 않고 항상 "무효" 도장을 먼저 찍는다 —
+  //    실제 처리 시점(3)에 재확인해서 면역이면 무효→유효로 뒤집는 연출을 보여준다.
   for (let i = 0; i < size; i++) {
     for (const p of ['A', 'B']) {
       const slot = slots[p][i];
       if (slot && slot.card.type === 'smother') {
         const victim = slots[opponentOf(p)][i];
-        if (victim && !ab.isNullifyImmune(state, victim.owner)) {
+        const isDunkin = ab.dunkinHolder(state) === p;
+        if (victim && !isDunkin) {
           victim.nullified = true;
           ui.markRevealNullified(opponentOf(p), i);
         }
@@ -158,31 +216,36 @@ async function resolveCard(state, player, slot, slots, idx, recorder) {
   const opp = opponentOf(player);
 
   if (slot.nullified) {
-    ui.showToast(`${PLAYER_LABEL[player]} ${card.name} 무효(불발)`);
-    await sleep(500);
-    return null;
+    // 아삭토스트: 실제 처리 시점에 재확인(라운드 중 획득해도 반영) — 면역이면 무효→유효로 뒤집고 정상 발동.
+    if (ab.isNullifyImmune(state, player)) {
+      ui.flashAbility('toast');
+      await ui.flipStampToSaved(player, idx);
+      ui.showToast(`🛟 아삭토스트 발동: ${PLAYER_LABEL[player]} ${card.name} 무효화 무시하고 발동!`, 2200);
+      await sleep(300);
+      slot.nullified = false;
+    } else {
+      ui.showToast(`${PLAYER_LABEL[player]} ${card.name} 무효(불발)`);
+      await sleep(500);
+      return null;
+    }
   }
 
-  // 소송뭉개기: 같은 턴 상대 카드 무효화(면책 반영은 (2)). 여기선 연출 + 던진도너츠 복사.
+  // 소송뭉개기: 던진도너츠 보유자면 무효화 대신 상대의 같은 턴 카드 효과를 그대로 복사해서 쓴다
+  // (상대 카드는 무효화되지 않고 자기 턴에 정상 발동). 아니면 일반 무효화 연출(실효는 이미 (2)에서 적용됨).
   if (card.type === 'smother') {
     const co = slots[opp][idx];
-    if (co && ab.isNullifyImmune(state, co.owner)) {
-      ui.flashAbility('toast');
-      ui.showToast(`🛟 아삭토스트 면역: ${PLAYER_LABEL[player]} 소송뭉개기 실패`, 2000);
-      await sleep(400);
-      return null;
+    const isDunkin = ab.dunkinHolder(state) === player;
+    if (isDunkin && co && MOVE_TYPES.includes(co.card.type)) {
+      ui.flashAbility('dunkin');
+      ui.showToast(`🍩 던진도너츠 역고소 카피: ${co.card.name} 효과 복사! (상대 카드는 무효화되지 않음)`, 2400, { multi: true });
+      await theater.say(state, { cardType: 'smother', actor: player, victim: opp });
+      await sleep(300);
+      return performMove(state, player, co.card, recorder);
     }
     recorder.add({ kind: 'nullify', round: state.round, actor: player, victim: opp });
     ui.showToast(`🚫 ${PLAYER_LABEL[player]} 소송뭉개기: ${PLAYER_LABEL[opp]} 같은 턴 무효`, 2000);
     await theater.say(state, { cardType: 'smother', actor: player, victim: opp });
     await sleep(300);
-    // 던진도너츠: 무효화한 상대 카드(이동 카드)의 효과를 복사
-    if (ab.dunkinHolder(state) === player && co && MOVE_TYPES.includes(co.card.type)) {
-      ui.flashAbility('dunkin');
-      ui.showToast(`🍩 던진도너츠 역고소 카피: ${co.card.name} 효과 복사!`, 2000);
-      await sleep(300);
-      return performMove(state, player, co.card, recorder);
-    }
     return null;
   }
 
@@ -214,13 +277,21 @@ async function performMove(state, player, card, recorder) {
   const toOwner = behavior.toOwner(state, player);
   const fromOwner = target.owner;
 
-  // 방어 능력(보호막/복불복)으로 공격이 막히는지
-  const blk = ab.checkAttackBlocked(state, target, player);
-  if (blk && blk.blocked) {
-    ui.flashAbility(blk.ability);
-    ui.showToast(blk.text, 2000);
+  // 화남돼지집 보호막: 소유자와 무관하게(중앙 포함) 대상 지정 자체를 1회 차단
+  const pigBlk = ab.checkPigShieldBlocked(state, target);
+  if (pigBlk && pigBlk.blocked) {
+    ui.flashAbility('pig');
+    ui.setShieldVisible(pigBlk.tmId, false);
+    ui.showToast(pigBlk.text, 2000);
     await sleep(500);
     return null;
+  }
+
+  // 맹한커피 복불복: 뒷면 카드 2장 중 하나를 골라 성공/실패로 공격 통과 여부를 정한다(양쪽 다 관전)
+  if (ab.isCoffeeGambleTarget(state, target, player)) {
+    ui.flashAbility('coffee');
+    const blocked = await ui.playCoffeeGamble(player, target.owner, isHuman(state, player));
+    if (blocked) return null;
   }
 
   const collision = fromOwner === opp; // 상대 상표를 뺏김/리셋 = 충돌 연출

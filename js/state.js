@@ -72,8 +72,8 @@ export function createState({ mode = 'ai', abilitiesEnabled = false, expansionEn
     hands: { A: [], B: [] },
     roundTokens: { A: 0, B: 0 },
     roundSecuredTwo: null,      // 이번 라운드에 먼저 2개 확보한 사람
-    shields: { A: false, B: false }, // 확정 보호막(화남돼지집)
-    noInstantWin,               // 김밥전구: 즉시 승리 없음
+    renownedClaim: null,        // 저명상표 주장으로 지정된 상표 id(1R 1차에서만 유효)
+    noInstantWin,               // 김밥전구: 즉시 승리 없음(라운드 종료 시점에만 판정)
     winner: null,
     log: [],
   };
@@ -98,13 +98,18 @@ export function applyMove(state, tmId, toOwner) {
   return from;
 }
 
-// 즉시 승리: 한 플레이어가 모든 상표 소유 (김밥전구가 있으면 비활성)
-export function checkInstantWin(state) {
-  if (state.noInstantWin) return null;
+// 순수 전체 소유 판정(noInstantWin 무시) — 김밥전구의 "라운드 종료 시점" 판정에 사용
+export function checkFullOwnership(state) {
   for (const p of ['A', 'B']) {
     if (countOwned(state, p) === state.trademarks.length) return p;
   }
   return null;
+}
+
+// 즉시 승리: 한 플레이어가 모든 상표 소유 (김밥전구가 있으면 라운드 중 비활성)
+export function checkInstantWin(state) {
+  if (state.noInstantWin) return null;
+  return checkFullOwnership(state);
 }
 
 // 라운드 토큰: 한 라운드 중 상표 2개를 "먼저" 확보한 플레이어가 획득(라운드당 1개).
