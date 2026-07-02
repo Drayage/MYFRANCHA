@@ -106,11 +106,13 @@
   animation: shieldPulse 1.6s ease-in-out infinite;
 }
 
-/* 저명상표 주장 리본(1R 1차 한정) — 보호막 뱃지와 안 겹치게 더 아래쪽 */
+/* 저명상표 주장 리본(1R 1차 한정) — 토큰 밖으로 절대배치해 튀어나오면 같은 영역의
+   다른 상표 토큰(각각 will-change:transform으로 독립된 스태킹 컨텍스트)에 가려지므로,
+   토큰 내부 정상 흐름에 놓아 토큰 높이 자체를 늘려 절대 겹치지 않게 한다. */
 .tm-renowned {
-  position: absolute; bottom: -28px; left: 50%; transform: translateX(-50%);
-  white-space: nowrap; background: var(--gold); color: #2a1850; font-weight: 900;
-  font-size: .62rem; padding: 2px 8px; border-radius: 999px; box-shadow: var(--shadow); z-index: 6;
+  display: block; margin-top: 4px; white-space: nowrap; background: var(--gold);
+  color: #2a1850; font-weight: 900; font-size: .62rem; padding: 2px 8px;
+  border-radius: 999px; box-shadow: var(--shadow);
 }
 
 /* 선택 가능 상표 하이라이트 */
