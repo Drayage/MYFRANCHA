@@ -45,7 +45,9 @@ export async function runGame(state, recorder) {
       state.setIndex = s;
       ui.updateHUD(state);
       const size = SET_SIZES[s];
-      ui.setBanner(`R${round} ${['1차','2차','3차'][s]}(${size}장) · 선플 ${PLAYER_LABEL[state.firstPlayer]}`);
+      // 저명상표 주장이 걸려있는 동안(1R 1차 한정)은 토스트가 사라진 뒤에도 배너로 계속 안내
+      const renownedNote = (round === 1 && s === 0 && state.renownedClaim) ? ' · 📜 저명상표는 출원 불가(눌러서 확인)' : '';
+      ui.setBanner(`R${round} ${['1차','2차','3차'][s]}(${size}장) · 선플 ${PLAYER_LABEL[state.firstPlayer]}${renownedNote}`);
 
       const submissions = await collectSubmissions(state, size);
       const ended = await resolveSet(state, submissions, size, recorder);

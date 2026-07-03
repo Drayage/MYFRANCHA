@@ -111,7 +111,7 @@
    토큰 내부 정상 흐름에 놓아 토큰 높이 자체를 늘려 절대 겹치지 않게 한다. */
 .tm-renowned {
   display: block; margin-top: 4px; white-space: nowrap; background: var(--gold);
-  color: #2a1850; font-weight: 900; font-size: .62rem; padding: 2px 8px;
+  color: #2a1850; font-weight: 900; font-size: .62rem; padding: 2px 8px; cursor: pointer;
   border-radius: 999px; box-shadow: var(--shadow);
 }
 

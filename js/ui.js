@@ -107,7 +107,8 @@ export function setShieldVisible(tmId, visible) {
   }
 }
 
-// 저명상표 주장 리본(1R 1차 한정 표시, 사용 후 제거)
+// 저명상표 주장 리본(1R 1차 한정 표시, 사용 후 제거) — 눌러서 설명을 볼 수 있게(클릭·hover 둘 다)
+const RENOWNED_DESC = '을이 지정한 상표는 이번 라운드 1차(1장)에서 갑이 "출원" 카드로 가져올 수 없습니다. (1R 1차가 끝나면 사라지는 1회성 효과)';
 export function setRenownedMark(tmId, visible) {
   const token = document.querySelector(`.tm-token[data-tm="${tmId}"]`);
   if (!token) return;
@@ -116,10 +117,29 @@ export function setRenownedMark(tmId, visible) {
     ribbon = document.createElement('span');
     ribbon.className = 'tm-renowned';
     ribbon.textContent = '📜 저명상표';
+    ribbon.title = RENOWNED_DESC;
+    ribbon.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showRenownedInfoCard(ribbon);
+    });
     token.appendChild(ribbon);
   } else if (!visible && ribbon) {
     ribbon.remove();
   }
+}
+function showRenownedInfoCard(anchorEl) {
+  hideAbilityCard();
+  const card = document.createElement('div');
+  card.className = 'ability-card';
+  card.innerHTML = `
+    <div class="ac-head"><span class="ac-emoji">📜</span><span class="ac-name">저명상표 주장</span></div>
+    <div class="ac-badge">1회성 규칙</div>
+    <div class="ac-desc">${RENOWNED_DESC}</div>`;
+  document.body.appendChild(card);
+  positionAbilityCard(card, anchorEl);
+  requestAnimationFrame(() => card.classList.add('show'));
+  abilityCardEl = card;
+  setTimeout(() => document.addEventListener('pointerdown', hideAbilityCard, { once: true }), 0);
 }
 
 // 리플레이용: 모든 토큰을 중앙으로 즉시 복귀
