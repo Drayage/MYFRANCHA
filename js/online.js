@@ -5,7 +5,7 @@
 // isOnlineConfigured()가 true가 되고, 아래 room 함수들이 실제 Firebase SDK를
 // 동적으로 로드해 README에 정의된 구조로 room을 만들고 구독한다:
 //   room { players, table, turnState, round, log }
-import { FIREBASE_CONFIG, FIREBASE_PLACEHOLDER_KEY } from './firebase-config.js';
+import { FIREBASE_CONFIG, FIREBASE_PLACEHOLDER_KEY, DB_NAMESPACE } from './firebase-config.js';
 import * as ui from './ui.js';
 
 const FIREBASE_APP_SRC = 'https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js';
@@ -61,12 +61,16 @@ function randomRoomId() {
   return Math.random().toString(36).slice(2, 7).toUpperCase();
 }
 
+// 이 Firebase 프로젝트는 다른 게임과 공유되므로, 이 앱의 모든 경로는 반드시
+// DB_NAMESPACE(myfrancha) 하위로만 읽고 쓴다 — 다른 앱의 rooms/... 와 절대 안 겹치게.
+const roomPath = (roomId, sub = '') => `${DB_NAMESPACE}/rooms/${roomId}${sub ? `/${sub}` : ''}`;
+
 // room { players: {A: uid|null, B: uid|null}, table: {...}, turnState: {...}, round: n, log: [...] }
 export async function createRoom(hostName) {
   if (!isOnlineConfigured()) throw new Error('Firebase가 아직 설정되지 않았습니다.');
   const { db, dbMod } = await loadFirebase();
   const roomId = randomRoomId();
-  const roomRef = dbMod.ref(db, `rooms/${roomId}`);
+  const roomRef = dbMod.ref(db, roomPath(roomId));
   const room = {
     players: { A: hostName, B: null },
     table: null,
@@ -82,20 +86,20 @@ export async function createRoom(hostName) {
 export async function joinRoom(roomId, guestName) {
   if (!isOnlineConfigured()) throw new Error('Firebase가 아직 설정되지 않았습니다.');
   const { db, dbMod } = await loadFirebase();
-  const roomRef = dbMod.ref(db, `rooms/${roomId}`);
+  const roomRef = dbMod.ref(db, roomPath(roomId));
   const snap = await dbMod.get(roomRef);
   if (!snap.exists()) throw new Error('존재하지 않는 방입니다.');
-  await dbMod.update(dbMod.ref(db, `rooms/${roomId}/players`), { B: guestName });
+  await dbMod.update(dbMod.ref(db, roomPath(roomId, 'players')), { B: guestName });
   return snap.val();
 }
 
 export async function subscribeRoom(roomId, onChange) {
   const { db, dbMod } = await loadFirebase();
-  const roomRef = dbMod.ref(db, `rooms/${roomId}`);
+  const roomRef = dbMod.ref(db, roomPath(roomId));
   return dbMod.onValue(roomRef, (snap) => onChange(snap.val()));
 }
 
 export async function pushRoomUpdate(roomId, patch) {
   const { db, dbMod } = await loadFirebase();
-  await dbMod.update(dbMod.ref(db, `rooms/${roomId}`), patch);
+  await dbMod.update(dbMod.ref(db, roomPath(roomId)), patch);
 }

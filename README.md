@@ -79,15 +79,20 @@ python3 -m http.server 8000
 - GitHub Pages 배포
 
 ## 🌐 온라인 대전 준비 (Firebase)
-실제 대전 매칭은 아직 연결 전이지만, 키만 넣으면 바로 이어갈 수 있도록 자리를 만들어 뒀습니다.
-1. `js/firebase-config.js`의 `FIREBASE_CONFIG`에 Firebase 콘솔에서 발급한 실제 값을 채웁니다
-   (apiKey가 플레이스홀더 그대로면 온라인 모드는 계속 "준비중" 안내만 표시됩니다).
-2. Realtime Database를 활성화하고, `js/online.js` 상단 주석의 예시 규칙을 참고해 보안 규칙을
-   설정합니다.
-3. `js/online.js`는 `room { players, table, turnState, round, log }` 구조로
-   `createRoom` / `joinRoom` / `subscribeRoom` / `pushRoomUpdate` 헬퍼(Firebase SDK를 CDN에서
-   동적 로드)를 이미 제공합니다 — 실제 로비 UI와 `engine.js` 동기화는 다음 단계에서 이어서
-   구현하면 됩니다.
+`js/firebase-config.js`에 실제 Firebase 프로젝트 키가 연결되어 있어 `isOnlineConfigured()`는
+true입니다. 이 프로젝트는 **다른 게임과 함께 쓰는 공유 Firebase 프로젝트**이므로, 이 앱의 모든
+Realtime Database 읽기/쓰기는 반드시 `DB_NAMESPACE`(`myfrancha`) 하위 경로
+(`myfrancha/rooms/...`)로만 이뤄집니다 — `js/online.js`의 `roomPath()` 헬퍼가 그 규칙을
+강제합니다. 다른 앱의 데이터와 섞이지 않도록 새 코드를 추가할 때도 이 네임스페이스를 벗어나지
+마세요. Realtime Database 보안 규칙도 이 네임스페이스로 분리해서 설정하세요:
+```json
+{ "rules": { "myfrancha": { "rooms": { "$roomId": { ".read": true, ".write": true } } } } }
+```
+`js/online.js`는 `room { players, table, turnState, round, log }` 구조로 `createRoom` /
+`joinRoom` / `subscribeRoom` / `pushRoomUpdate` 헬퍼(Firebase SDK를 CDN에서 동적 로드)를
+제공합니다. 현재 시작 화면의 "🌐 온라인 대전" 버튼은 Firebase 연결 자체는 됐지만 아직 실제
+방 만들기/참가 로비 UI와 `engine.js` 턴 동기화가 연결되기 전이라는 안내 모달을 띄웁니다 —
+그 로비 UI + 실시간 동기화가 다음 단계입니다.
 
 ## 📁 구조
 ```
