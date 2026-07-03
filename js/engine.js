@@ -12,10 +12,22 @@ import * as theater from './theater.js';
 import { move, sleep } from './animation.js';
 import { sfx } from './audio.js';
 import { saveCheckpoint, clearCheckpoint } from './persistence.js';
+import * as online from './online.js';
 
+// mode==='online'일 때 state.humanSide는 "이 브라우저(호스트)가 조작하는 진영".
+// 반대쪽은 실제로는 게스트가 조작하는 사람이므로 AI가 아니라 원격 요청으로 입력을 받는다.
 const isHuman = (state, player) => state.mode === 'local' || player === state.humanSide;
+const isRemote = (state, player) => state.mode === 'online' && player !== state.humanSide;
 const describe = (cards) => cards.map((c) => c.name).join(', ');
 const MOVE_TYPES = ['apply', 'prove', 'cancel'];
+
+// 화면 갱신 + (온라인이면) 게스트에게 현재 상태 스냅샷 전송. 실패해도 게임 진행은 막지 않는다.
+async function sync(state) {
+  ui.updateHUD(state);
+  if (state.mode === 'online') {
+    try { await online.pushState(state.roomId, state); } catch { /* 네트워크 순간 장애 — 다음 sync에서 다시 시도됨 */ }
+  }
+}
 
 // 게임 1판 실행. recorder에 이벤트를 기록한다.
 // resume: 새로고침 등으로 중단된 판을 이어할 때 넘기는 저장된 state 스냅샷(라운드/세트 경계에서 저장됨).
@@ -26,7 +38,7 @@ export async function runGame(state, recorder, resume = null) {
   if (resume) Object.assign(state, resume);
 
   ui.buildBoard(state);
-  ui.updateHUD(state);
+  await sync(state);
   if (resume) {
     // buildBoard는 마커/토큰만 새로 그리므로, 새로고침 시점에 걸려있던 시각 효과를 복원.
     for (const t of state.trademarks) if (t.shielded) ui.setShieldVisible(t.id, true);
@@ -54,13 +66,13 @@ export async function runGame(state, recorder, resume = null) {
         ui.showToast('🛡️ 화남돼지집: 대상 지정 방지 보호막 생성!');
       }
       if (rs.daiso) { ui.flashAbility('daiso'); ui.showToast(`🔁 다없소: ${PLAYER_LABEL[rs.daiso]} 출원→소송뭉개기`); }
-      ui.updateHUD(state);
+      await sync(state);
       if (rs.shieldTmId || rs.daiso) await sleep(500);
     }
 
     for (let s = isResumedRound ? resumeSet : 0; s < SET_SIZES.length; s++) {
       state.setIndex = s;
-      ui.updateHUD(state);
+      await sync(state);
       const size = SET_SIZES[s];
       // 저명상표 주장이 걸려있는 동안(1R 1차 한정)은 토스트가 사라진 뒤에도 배너로 계속 안내
       const renownedNote = (round === 1 && s === 0 && state.renownedClaim) ? ' · 📜 저명상표는 출원 불가(눌러서 확인)' : '';
@@ -84,7 +96,7 @@ export async function runGame(state, recorder, resume = null) {
         ui.flashAbility('baguette');
         ui.showToast(`👑 빨리바게뜨: ${PLAYER_LABEL[state.firstPlayer]} 선 유지`);
       }
-      ui.updateHUD(state);
+      await sync(state);
       await sleep(300);
     }
 
@@ -131,6 +143,11 @@ async function renownedClaimPhase(state) {
   let claimed;
   if (isHuman(state, claimant)) {
     claimed = await ui.selectRenownedClaim(state.trademarks, `${PLAYER_LABEL[claimant]} — 상표를 클릭해 능력을 확인한 뒤 "이걸로 선택"을 누르세요`);
+  } else if (isRemote(state, claimant)) {
+    ui.setBanner(`${PLAYER_LABEL[claimant]}(상대) — 저명상표 고르는 중…`);
+    await sync(state);
+    const answer = await online.requestFromGuest(state.roomId, { player: claimant, kind: 'renownedClaim' });
+    claimed = state.trademarks.find((t) => t.id === answer.tmId) || state.trademarks[0];
   } else {
     ui.setBanner(`🤖 ${PLAYER_LABEL[claimant]}(AI) — 저명상표 고르는 중…`);
     await sleep(500);
@@ -163,6 +180,13 @@ async function getSubmission(state, player, size, peek) {
   if (isHuman(state, player)) {
     if (state.mode === 'local') await ui.showCover(player);
     chosen = await ui.selectCards(state, player, size, { peekInfo: peek });
+  } else if (isRemote(state, player)) {
+    ui.setBanner(`${PLAYER_LABEL[player]}(상대) 카드 선택 중…`);
+    await sync(state);
+    const answer = await online.requestFromGuest(state.roomId, { player, kind: 'cards', size, peek });
+    const hand = state.hands[player];
+    chosen = answer.uids.map((uid) => hand.find((c) => c.uid === uid)).filter(Boolean);
+    if (chosen.length !== size) chosen = hand.slice(0, size); // 응답 불일치 방어(연결 문제 등) — 손패 앞에서부터 채움
   } else {
     ui.setBanner(`🤖 ${PLAYER_LABEL[player]}(AI) 제출 중…`);
     await sleep(500);
@@ -225,7 +249,7 @@ async function resolveSet(state, submissions, size, recorder) {
     slot.resolved = true;
     ui.highlightRevealCard(player, idx);
     const win = await resolveCard(state, player, slot, slots, idx, recorder);
-    ui.updateHUD(state);
+    await sync(state);
     if (win) { state.winner = win; ui.clearRevealArea(); return true; }
 
     const tokGot = evaluateRoundToken(state);
@@ -302,6 +326,11 @@ async function performMove(state, player, card, recorder) {
   let target;
   if (isHuman(state, player)) {
     target = await ui.selectTrademark(valid, `${PLAYER_LABEL[player]} ${card.name}: 대상 선택`);
+  } else if (isRemote(state, player)) {
+    ui.setBanner(`${PLAYER_LABEL[player]}(상대) ${card.name} 대상 선택 중…`);
+    await sync(state);
+    const answer = await online.requestFromGuest(state.roomId, { player, kind: 'target', validIds: valid.map((t) => t.id), cardName: card.name });
+    target = valid.find((t) => t.id === answer.tmId) || valid[0];
   } else {
     ui.setBanner(`🤖 ${PLAYER_LABEL[player]}(AI) ${card.name}…`);
     await sleep(450);
@@ -346,15 +375,19 @@ async function performMove(state, player, card, recorder) {
   return checkInstantWin(state);
 }
 
-function endGame(state, recorder, result) {
+async function endGame(state, recorder, result) {
   clearCheckpoint();
   if (!result.winner) {
     ui.setBanner('🤝 무승부');
-  } else if (state.mode === 'ai') {
+  } else if (state.mode === 'ai' || state.mode === 'online') {
     const won = result.winner === state.humanSide;
     ui.setBanner(won ? '🎉 승리했습니다!' : '😢 패배했습니다…');
   } else {
     ui.setBanner(`🏆 ${PLAYER_LABEL[result.winner]} 승리!`);
+  }
+  if (state.mode === 'online') {
+    await sync(state);
+    try { await online.markDone(state.roomId, result); } catch { /* 게스트는 상태 폴링으로도 게임 종료를 알 수 있음 */ }
   }
   return result;
 }

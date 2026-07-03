@@ -12,8 +12,8 @@
   **"승리했습니다! / 패배했습니다…"** 로 내 기준 결과를 보여줍니다.
 - 👥 **로컬 패스앤플레이** — 한 기기에서 번갈아(가림막 화면 제공). 둘 다 실제 플레이어라
   결과는 그대로 "갑(A)/을(B) 승리"로 표시됩니다.
-- 🌐 **온라인 대전 (준비중)** — Firebase Realtime DB 연동 자리(아래 "온라인 대전 준비" 참고).
-  실제 키가 없으면 버튼 클릭 시 안내 모달만 뜹니다.
+- 🌐 **온라인 대전** — Firebase Realtime DB로 방 코드 기반 매칭(호스트가 방 만들기 →
+  코드를 상대에게 전달 → 상대가 방 참가). 자세한 구조는 아래 "온라인 대전" 참고.
 
 ## ✨ 옵션 (시작 화면 토글)
 - 📖 **튜토리얼 켜기** — 켜면 게임 시작 시 코치마크 가이드 노출(기본 꺼짐)
@@ -78,21 +78,38 @@ python3 -m http.server 8000
 - PWA (manifest + service worker)
 - GitHub Pages 배포
 
-## 🌐 온라인 대전 준비 (Firebase)
-`js/firebase-config.js`에 실제 Firebase 프로젝트 키가 연결되어 있어 `isOnlineConfigured()`는
-true입니다. 이 프로젝트는 **다른 게임과 함께 쓰는 공유 Firebase 프로젝트**이므로, 이 앱의 모든
-Realtime Database 읽기/쓰기는 반드시 `DB_NAMESPACE`(`myfrancha`) 하위 경로
-(`myfrancha/rooms/...`)로만 이뤄집니다 — `js/online.js`의 `roomPath()` 헬퍼가 그 규칙을
-강제합니다. 다른 앱의 데이터와 섞이지 않도록 새 코드를 추가할 때도 이 네임스페이스를 벗어나지
-마세요. Realtime Database 보안 규칙도 이 네임스페이스로 분리해서 설정하세요:
+## 🌐 온라인 대전 (Firebase)
+`js/firebase-config.js`에 실제 Firebase 프로젝트(frenzy-49857) 키가 연결되어 있습니다. 이
+프로젝트는 **다른 게임과 함께 쓰는 공유 Firebase 프로젝트**이고, 실제 Realtime Database
+보안 규칙은 `games/` 경로만 열려 있습니다:
 ```json
-{ "rules": { "myfrancha": { "rooms": { "$roomId": { ".read": true, ".write": true } } } } }
+{ "rules": { "games": { ".read": true, ".write": true } } }
 ```
-`js/online.js`는 `room { players, table, turnState, round, log }` 구조로 `createRoom` /
-`joinRoom` / `subscribeRoom` / `pushRoomUpdate` 헬퍼(Firebase SDK를 CDN에서 동적 로드)를
-제공합니다. 현재 시작 화면의 "🌐 온라인 대전" 버튼은 Firebase 연결 자체는 됐지만 아직 실제
-방 만들기/참가 로비 UI와 `engine.js` 턴 동기화가 연결되기 전이라는 안내 모달을 띄웁니다 —
-그 로비 UI + 실시간 동기화가 다음 단계입니다.
+그래서 이 앱의 모든 읽기/쓰기는 그 안에 다시 이 앱 전용 네임스페이스를 둬서
+`games/myfrancha/rooms/...` 로만 이뤄집니다(`DB_NAMESPACE = 'games/myfrancha'`,
+`js/online.js`의 `roomPath()` 헬퍼가 강제). 다른 게임의 데이터와 섞이지 않도록 새 코드를
+추가할 때도 이 네임스페이스를 벗어나지 마세요.
+
+### 동작 방식 — 호스트 권위 모델
+방을 만든 사람(호스트)이 `engine.js`의 게임 루프를 로컬에서 그대로 돌립니다(오프라인과 동일한
+코드 경로). 다른 점은 상대(게스트) 차례의 카드/대상 선택을 AI 대신 Firebase 왕복 요청으로
+받는다는 것뿐입니다(`engine.js`의 `isRemote` 분기). 게스트는 별도 엔진 없이, 동기화되는
+`state` 스냅샷을 그대로 화면에 그리는 얇은 클라이언트이고, 자기 차례엔 오프라인과 같은
+`ui.selectCards`/`selectTrademark`/`selectRenownedClaim` 화면으로 입력을 받아 응답만
+돌려줍니다 — 그래서 게스트가 보는 카드 선택 UI는 로컬/AI 모드와 완전히 동일합니다.
+
+알려진 범위 제한(1단계):
+- 게스트 화면은 상표 이동을 애니메이션으로 재현하지 않고 상태가 바뀔 때마다 다시 그립니다
+  (호스트만 곡선 이동·충돌 연출을 봅니다).
+- 온라인 대전은 리플레이를 지원하지 않습니다(게스트는 recorder가 없음).
+- 맹한커피 복불복 미니게임은 호스트 화면에만 보이고(공격자가 게스트면 자동으로 판정),
+  게스트에게 실시간으로 보이지 않습니다.
+- 호스트가 나가면 게스트는 갱신이 멈춘 화면만 보게 됩니다(별도 안내 없음).
+- 새로고침 시: 호스트는 기존 "🔄 이어하기"로 자동 복구되고, 게스트는 시작 화면의
+  "🌐 온라인 방 재접속" 버튼으로 같은 방에 다시 들어갑니다.
+
+`js/online.js`는 `createRoom` / `joinRoom` / `subscribeRoom` / `requestFromGuest` /
+`subscribeRequest` / `answerRequest` / `pushState` 등을 제공합니다.
 
 ## 📁 구조
 ```

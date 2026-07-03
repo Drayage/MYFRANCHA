@@ -163,10 +163,11 @@ export function updateHUD(state) {
   // 선플레이어 영역 라벨에 (선) 마커
   $('first-A').style.visibility = state.firstPlayer === 'A' ? 'visible' : 'hidden';
   $('first-B').style.visibility = state.firstPlayer === 'B' ? 'visible' : 'hidden';
-  // 사람/AI 진영 표시(AI 모드)
-  if (state.mode === 'ai') {
-    $('side-A').textContent = state.humanSide === 'A' ? '나' : 'AI';
-    $('side-B').textContent = state.humanSide === 'B' ? '나' : 'AI';
+  // 사람/AI/온라인 상대 진영 표시
+  if (state.mode === 'ai' || state.mode === 'online') {
+    const oppLabel = state.mode === 'ai' ? 'AI' : '상대';
+    $('side-A').textContent = state.humanSide === 'A' ? '나' : oppLabel;
+    $('side-B').textContent = state.humanSide === 'B' ? '나' : oppLabel;
     $('side-A').className = `side-badge ${state.humanSide === 'A' ? 'me' : 'ai'}`;
     $('side-B').className = `side-badge ${state.humanSide === 'B' ? 'me' : 'ai'}`;
   } else {
@@ -568,12 +569,13 @@ export function showGameOver(state, result, { onReplay, onHome }) {
     draw: '완전 무승부!',
   }[result.reason] || '';
 
-  // AI 대전은 "갑/을" 대신 내가 이겼는지/졌는지로 표시(진영은 매판 랜덤 배정되므로).
+  // AI/온라인 대전은 "갑/을" 대신 내가 이겼는지/졌는지로 표시(온라인은 보는 사람마다
+  // state.humanSide가 자기 자신 진영으로 다르게 세팅되어 있어 각자 화면에서 옳게 보임).
   // 로컬 패스앤플레이는 둘 다 실제 플레이어라 그대로 갑/을로 표시.
   let winLine, subLine = '';
   if (!result.winner) {
     winLine = '🤝 무승부';
-  } else if (state.mode === 'ai') {
+  } else if (state.mode === 'ai' || state.mode === 'online') {
     const won = result.winner === state.humanSide;
     winLine = won ? '🎉 승리했습니다!' : '😢 패배했습니다…';
     subLine = `<p class="sub-result">나는 ${PLAYER_LABEL[state.humanSide]}(${state.humanSide}) · 승자는 ${PLAYER_LABEL[result.winner]}(${result.winner})</p>`;
