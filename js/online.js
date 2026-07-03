@@ -1,10 +1,15 @@
 // online.js — Firebase Realtime Database 온라인 대전 준비 레이어.
 //
-// 지금은 firebase-config.js에 실제 키가 없으므로 "준비중" 안내만 표시한다.
-// 사용자가 실제 Firebase 프로젝트 키를 firebase-config.js에 채워 넣으면
-// isOnlineConfigured()가 true가 되고, 아래 room 함수들이 실제 Firebase SDK를
-// 동적으로 로드해 README에 정의된 구조로 room을 만들고 구독한다:
+// firebase-config.js에 실제 키가 채워지면 isOnlineConfigured()가 true가 되고,
+// 아래 room 함수들이 Firebase SDK를 동적으로 로드해 room을 만들고 구독한다:
 //   room { players, table, turnState, round, log }
+//
+// 상대 손패(쉬어유/햄부기퀸 능력 포함) 동기화 방식 — 결정사항:
+// 아는 사람들끼리 하는 캐주얼 게임이라, 손패를 유저별 전용 경로로 분리해 서버(RTDB 규칙)로
+// 숨기는 대신 전체 state를 양쪽에 그대로 동기화하고 로컬모드 가림막과 같은 "신뢰 기반"으로
+// 감춘다. 개발자도구로 상대 손패를 미리 볼 수 있다는 트레이드오프를 감수한 선택 — 나중에
+// 진짜 히든 정보가 필요해지면 hands를 rooms/{id}/hands/{A,B}로 분리해 uid별 read 규칙을
+// 걸고, 능력 발동 시점에만 해당 카드를 공개 경로로 옮기는 방식으로 바꾸면 된다.
 import { FIREBASE_CONFIG, FIREBASE_PLACEHOLDER_KEY, DB_NAMESPACE } from './firebase-config.js';
 import * as ui from './ui.js';
 
