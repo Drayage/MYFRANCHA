@@ -6,6 +6,7 @@ import { showHelp, showCoachmarks } from './onboarding.js';
 import { createRecorder, saveReplay, loadReplay, hasReplay, play as playReplay } from './replay.js';
 import * as audio from './audio.js';
 import { isOnlineConfigured, showOnlineComingSoon } from './online.js';
+import * as persistence from './persistence.js';
 
 const $ = (id) => document.getElementById(id);
 const show = (id) => { $('screen-start').classList.toggle('hidden', id !== 'start'); $('screen-game').classList.toggle('hidden', id !== 'game'); };
@@ -34,7 +35,24 @@ async function startGame(mode) {
   // 리플레이 때 새로 뽑으면 tmId가 안 맞아 상표가 안 움직이는 버그가 생김.
   const trademarks = state.trademarks.map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, ability: t.ability }));
   const recorder = createRecorder({ mode, ...opts, trademarks });
-  const result = await runGame(state, recorder);
+  await playOut(state, recorder, null);
+}
+
+// 새로고침 등으로 중단된 판이 있으면 저장된 지점(라운드/세트 경계)부터 이어한다.
+async function resumeGame() {
+  const saved = persistence.loadCheckpoint();
+  if (!saved) return;
+  show('game');
+  const trademarks = saved.trademarks.map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, ability: t.ability }));
+  const recorder = createRecorder({
+    mode: saved.mode, abilitiesEnabled: saved.abilitiesEnabled,
+    expansionEnabled: saved.expansionEnabled, theaterEnabled: saved.theaterEnabled, trademarks,
+  });
+  await playOut(saved, recorder, saved);
+}
+
+async function playOut(state, recorder, resume) {
+  const result = await runGame(state, recorder, resume);
   saveReplay(recorder, result);
   refreshReplayButton();
   const outcome = personalizedOutcome(state, result);
@@ -77,10 +95,23 @@ function goHome() {
   ui.closeModal();
   show('start');
   refreshReplayButton();
+  refreshContinueButton();
+}
+
+// 게임 화면 상단 🏠 버튼 전용: 진행 중인 판을 사람이 직접 나가기로 한 것이므로(새로고침과
+// 달리) 이어하기 대상에서 제외한다. (goHome은 게임 종료 후/리플레이 후에도 불리므로 여기서만 지움 —
+// 안 그러면 아직 이어하지 않은 저장된 판을 리플레이만 보고 나가도 지워지는 버그가 생김)
+function abandonGame() {
+  persistence.clearCheckpoint();
+  goHome();
 }
 
 function refreshReplayButton() {
   $('btn-replay-last').classList.toggle('hidden', !hasReplay());
+}
+
+function refreshContinueButton() {
+  $('btn-continue').classList.toggle('hidden', !persistence.hasCheckpoint());
 }
 
 function syncMuteButtons() {
@@ -104,12 +135,14 @@ function init() {
   withClickSfx($('btn-help'), showHelp);
   withClickSfx($('btn-help-game'), showHelp);
   withClickSfx($('btn-coach'), () => showCoachmarks());
-  withClickSfx($('btn-home'), goHome);
+  withClickSfx($('btn-home'), abandonGame);
   withClickSfx($('btn-replay-last'), () => runReplay(loadReplay()));
+  withClickSfx($('btn-continue'), resumeGame);
   $('btn-mute').onclick = toggleMute;
   $('btn-mute-game').onclick = toggleMute;
   syncMuteButtons();
   refreshReplayButton();
+  refreshContinueButton();
   $('btn-online').classList.toggle('hidden', false); // 항상 노출(클릭 시 안내), 준비되면 isOnlineConfigured()로 분기 가능
 
   audio.startBgm();

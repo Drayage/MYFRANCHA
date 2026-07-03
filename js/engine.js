@@ -11,37 +11,54 @@ import * as ui from './ui.js';
 import * as theater from './theater.js';
 import { move, sleep } from './animation.js';
 import { sfx } from './audio.js';
+import { saveCheckpoint, clearCheckpoint } from './persistence.js';
 
 const isHuman = (state, player) => state.mode === 'local' || player === state.humanSide;
 const describe = (cards) => cards.map((c) => c.name).join(', ');
 const MOVE_TYPES = ['apply', 'prove', 'cancel'];
 
 // 게임 1판 실행. recorder에 이벤트를 기록한다.
-export async function runGame(state, recorder) {
+// resume: 새로고침 등으로 중단된 판을 이어할 때 넘기는 저장된 state 스냅샷(라운드/세트 경계에서 저장됨).
+// 넘기면 시작 단계(룰 안내·저명상표 주장)를 건너뛰고, 저장된 라운드의 저장된 세트부터 재개한다.
+export async function runGame(state, recorder, resume = null) {
+  const resumeRound = resume ? resume.round : null;
+  const resumeSet = resume ? resume.setIndex : null;
+  if (resume) Object.assign(state, resume);
+
   ui.buildBoard(state);
   ui.updateHUD(state);
-
-  await announceRuleChanges(state);
-  await renownedClaimPhase(state);
-
-  for (let round = 1; round <= TOTAL_ROUNDS; round++) {
-    state.round = round;
-    state.roundSecuredTwo = null;
-    state.hands.A = dealHand();
-    state.hands.B = dealHand();
-
-    // 라운드 시작 능력(보호막/패 변환)
-    const rs = ab.onRoundStart(state);
-    if (rs.shieldTmId) {
-      ui.flashAbility('pig');
-      ui.setShieldVisible(rs.shieldTmId, true);
-      ui.showToast('🛡️ 화남돼지집: 대상 지정 방지 보호막 생성!');
+  if (resume) {
+    // buildBoard는 마커/토큰만 새로 그리므로, 새로고침 시점에 걸려있던 시각 효과를 복원.
+    for (const t of state.trademarks) if (t.shielded) ui.setShieldVisible(t.id, true);
+    if (state.round === 1 && state.setIndex === 0 && state.renownedClaim) {
+      ui.setRenownedMark(state.renownedClaim, true);
     }
-    if (rs.daiso) { ui.flashAbility('daiso'); ui.showToast(`🔁 다없소: ${PLAYER_LABEL[rs.daiso]} 출원→소송뭉개기`); }
-    ui.updateHUD(state);
-    if (rs.shieldTmId || rs.daiso) await sleep(500);
+  } else {
+    await announceRuleChanges(state);
+    await renownedClaimPhase(state);
+  }
 
-    for (let s = 0; s < SET_SIZES.length; s++) {
+  for (let round = resumeRound || 1; round <= TOTAL_ROUNDS; round++) {
+    const isResumedRound = round === resumeRound;
+    if (!isResumedRound) {
+      state.round = round;
+      state.roundSecuredTwo = null;
+      state.hands.A = dealHand();
+      state.hands.B = dealHand();
+
+      // 라운드 시작 능력(보호막/패 변환)
+      const rs = ab.onRoundStart(state);
+      if (rs.shieldTmId) {
+        ui.flashAbility('pig');
+        ui.setShieldVisible(rs.shieldTmId, true);
+        ui.showToast('🛡️ 화남돼지집: 대상 지정 방지 보호막 생성!');
+      }
+      if (rs.daiso) { ui.flashAbility('daiso'); ui.showToast(`🔁 다없소: ${PLAYER_LABEL[rs.daiso]} 출원→소송뭉개기`); }
+      ui.updateHUD(state);
+      if (rs.shieldTmId || rs.daiso) await sleep(500);
+    }
+
+    for (let s = isResumedRound ? resumeSet : 0; s < SET_SIZES.length; s++) {
       state.setIndex = s;
       ui.updateHUD(state);
       const size = SET_SIZES[s];
@@ -49,6 +66,8 @@ export async function runGame(state, recorder) {
       const renownedNote = (round === 1 && s === 0 && state.renownedClaim) ? ' · 📜 저명상표는 출원 불가(눌러서 확인)' : '';
       ui.setBanner(`R${round} ${['1차','2차','3차'][s]}(${size}장) · 선플 ${PLAYER_LABEL[state.firstPlayer]}${renownedNote}`);
 
+      // 세트 시작(제출 받기 직전) 체크포인트 — 새로고침 시 이 세트 처음부터 다시 시작.
+      saveCheckpoint(state);
       const submissions = await collectSubmissions(state, size);
       const ended = await resolveSet(state, submissions, size, recorder);
       if (ended) { state.phase = 'game-over'; return endGame(state, recorder, { reason: 'instant', winner: state.winner }); }
@@ -328,6 +347,7 @@ async function performMove(state, player, card, recorder) {
 }
 
 function endGame(state, recorder, result) {
+  clearCheckpoint();
   if (!result.winner) {
     ui.setBanner('🤝 무승부');
   } else if (state.mode === 'ai') {
