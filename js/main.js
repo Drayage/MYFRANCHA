@@ -365,6 +365,10 @@ async function watchOnlineAsGuest(roomId) {
     } else if (req.kind === 'renownedClaim') {
       const claimed = await ui.selectRenownedClaim(state.trademarks, '상표를 클릭해 능력을 확인한 뒤 "이걸로 선택"을 누르세요');
       answer = { tmId: claimed.id };
+    } else if (req.kind === 'gamble') {
+      // 맹한커피 복불복: 게스트가 직접 카드를 골라 결과를 정한다(로컬/AI 모드와 같은 UI 재사용).
+      const blocked = await ui.playCoffeeGamble('B', req.defender, true);
+      answer = { blocked };
     }
     if (answer) await online.answerRequest(roomId, req.id, answer);
   });

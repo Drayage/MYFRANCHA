@@ -360,10 +360,20 @@ async function performMove(state, player, card, recorder) {
   // 맹한커피 복불복: 뒷면 카드 2장 중 하나를 골라 성공/실패로 공격 통과 여부를 정한다(양쪽 다 관전)
   if (ab.isCoffeeGambleTarget(state, target, player)) {
     ui.flashAbility('coffee');
-    const blocked = await ui.playCoffeeGamble(player, target.owner, isHuman(state, player));
-    // 온라인이면 게스트 화면에도 결과를 보여준다(관전용 애니메이션 — online.js/main.js 참고).
-    if (state.mode === 'online') {
-      online.pushEvent(state.roomId, { kind: 'gamble', attacker: player, defender: target.owner, blocked }).catch(() => {});
+    let blocked;
+    if (isRemote(state, player)) {
+      // 공격자가 게스트 — 카드 선택과 마찬가지로 게스트가 직접 고르게 요청하고(호스트가
+      // 대신 랜덤으로 정하지 않음), 결과가 오면 호스트 화면엔 관전용 연출로 보여준다.
+      ui.setBanner(`${PLAYER_LABEL[player]}(상대) 맹한커피 복불복 고르는 중…`);
+      const answer = await online.requestFromGuest(state.roomId, { player, kind: 'gamble', defender: target.owner });
+      blocked = !!answer.blocked;
+      await ui.playCoffeeGambleSpectator(player, target.owner, blocked);
+    } else {
+      blocked = await ui.playCoffeeGamble(player, target.owner, isHuman(state, player));
+      // 온라인이고 공격자가 호스트 자신이면, 게스트(수비자) 화면에도 결과를 관전용으로 보여준다.
+      if (state.mode === 'online') {
+        online.pushEvent(state.roomId, { kind: 'gamble', attacker: player, defender: target.owner, blocked }).catch(() => {});
+      }
     }
     if (blocked) return null;
   }
