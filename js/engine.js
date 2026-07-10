@@ -361,6 +361,10 @@ async function performMove(state, player, card, recorder) {
   if (ab.isCoffeeGambleTarget(state, target, player)) {
     ui.flashAbility('coffee');
     const blocked = await ui.playCoffeeGamble(player, target.owner, isHuman(state, player));
+    // 온라인이면 게스트 화면에도 결과를 보여준다(관전용 애니메이션 — online.js/main.js 참고).
+    if (state.mode === 'online') {
+      online.pushEvent(state.roomId, { kind: 'gamble', attacker: player, defender: target.owner, blocked }).catch(() => {});
+    }
     if (blocked) return null;
   }
 

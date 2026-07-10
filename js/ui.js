@@ -142,6 +142,16 @@ function showRenownedInfoCard(anchorEl) {
   setTimeout(() => document.addEventListener('pointerdown', hideAbilityCard, { once: true }), 0);
 }
 
+// 온라인 게스트 전용: 보호막 배지·저명상표 리본은 engine.js가 이 함수들을 딱 그 순간에만
+// 명시적으로 호출해서 붙이는데(호스트 쪽 이벤트), 게스트는 그 호출을 못 받는다. 대신 이 둘은
+// state 자체(trademarks[].shielded, renownedClaim)로 완전히 derivable하므로, 동기화된
+// state를 받을 때마다 이 함수로 그 값에 맞춰 다시 맞춰주면(idempotent) 게스트 화면에도 뜬다.
+export function syncTrademarkMarkers(state) {
+  for (const t of state.trademarks) setShieldVisible(t.id, !!t.shielded);
+  const renownedActive = state.round === 1 && state.setIndex === 0 && !!state.renownedClaim;
+  for (const t of state.trademarks) setRenownedMark(t.id, renownedActive && t.id === state.renownedClaim);
+}
+
 // 리플레이용: 모든 토큰을 중앙으로 즉시 복귀
 export function resetTokensToCenter(state) {
   for (const tm of state.trademarks) {
@@ -527,6 +537,42 @@ export function playCoffeeGamble(attacker, defender, humanPicks) {
     } else {
       setTimeout(() => finish(Math.random() < 0.5 ? 0 : 1), 700);
     }
+  });
+}
+
+// 온라인 게스트 전용 관전 버전: 결과(blocked)는 호스트에서 이미 정해졌으므로 그대로 반영만
+// 하고, 어느 카드가 "성공" 자리였는지는 게스트에게 의미가 없어 임의로 렌더링한다.
+export function playCoffeeGambleSpectator(attacker, defender, blocked) {
+  return new Promise((resolve) => {
+    const successSlot = blocked ? 1 : 0;
+    const overlay = document.createElement('div');
+    overlay.className = 'gamble-overlay';
+    overlay.innerHTML = `
+      <div class="gamble-box">
+        <div class="gamble-title">🪙 맹한커피 복불복!</div>
+        <div class="gamble-sub" id="gamble-sub-spec">${PLAYER_LABEL[attacker]}가 카드를 고르는 중…</div>
+        <div class="gamble-cards">
+          <button class="gcard" disabled><span class="gcard-inner"><span class="gcard-face gcard-back">?</span><span class="gcard-face gcard-front"></span></span></button>
+          <button class="gcard" disabled><span class="gcard-inner"><span class="gcard-face gcard-back">?</span><span class="gcard-face gcard-front"></span></span></button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('show'));
+    setTimeout(() => {
+      overlay.querySelectorAll('.gcard').forEach((btn, i) => {
+        const front = btn.querySelector('.gcard-front');
+        front.textContent = i === successSlot ? '✅ 성공' : '❌ 실패';
+        front.classList.add(i === successSlot ? 'gcard-success' : 'gcard-fail');
+        btn.querySelector('.gcard-inner').classList.add('flipped');
+      });
+      $('gamble-sub-spec').textContent = blocked
+        ? `${PLAYER_LABEL[defender]} 방어 성공! 공격 무효.`
+        : `${PLAYER_LABEL[attacker]} 공격 관통!`;
+      setTimeout(() => {
+        overlay.classList.remove('show');
+        setTimeout(() => { overlay.remove(); resolve(); }, 300);
+      }, 1300);
+    }, 700);
   });
 }
 

@@ -318,6 +318,8 @@ async function watchOnlineAsGuest(roomId) {
       }
       if (!boardBuilt) { ui.buildBoard(currentState); boardBuilt = true; }
       ui.updateHUD(currentState);
+      // 보호막 배지·저명상표 리본은 state에서 그대로 유도되므로 매 스냅샷마다 다시 맞춘다.
+      ui.syncTrademarkMarkers(currentState);
     }
     if (room.status === 'done' && room.result && !gameOverShown && currentState) {
       gameOverShown = true;
@@ -332,10 +334,16 @@ async function watchOnlineAsGuest(roomId) {
 
   // 이동/무효화/라운드토큰 이벤트: 재접속 시 지난 이벤트도 한꺼번에 오지만(과거분은 이미
   // state 스냅샷에 반영돼 있으므로) 구독 시작 이후(ts > subscribedAt)의 것만 애니메이션으로 재현.
+  // gamble(맹한커피 복불복)은 리플레이 대상이 아니므로 recorder에는 넣지 않고 관전 연출만 한다.
   const unsubEvents = await online.subscribeEvents(roomId, async (ev) => {
     if (!ev) return;
+    const isLive = ev.ts > subscribedAt;
+    if (ev.kind === 'gamble') {
+      if (isLive) await ui.playCoffeeGambleSpectator(ev.attacker, ev.defender, ev.blocked);
+      return;
+    }
     guestRecorder.add(ev);
-    if (ev.kind === 'move' && ev.ts > subscribedAt && boardBuilt) {
+    if (ev.kind === 'move' && isLive && boardBuilt) {
       audio.sfx(ev.collision ? 'collision' : 'move');
       await animateMove(ev.tmId, ev.toOwner, { collision: !!ev.collision });
     }
