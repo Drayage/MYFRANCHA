@@ -41,6 +41,19 @@ async function loadFirebase() {
   return firebaseModules;
 }
 
+// Firebase는 값 어딘가에 explicit undefined가 섞인 객체를 쓰면 거부한다
+// (이 계정의 다른 온라인 게임들에서 반복된 버그 — hammynap 등). 모든 쓰기 직전에
+// 깊은 순회로 undefined를 null로 치환해 방어한다.
+function stripUndefined(value) {
+  if (Array.isArray(value)) return value.map(stripUndefined);
+  if (value && typeof value === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = v === undefined ? null : stripUndefined(v);
+    return out;
+  }
+  return value === undefined ? null : value;
+}
+
 function randomRoomId() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 0/O, 1/I 제외
   let out = '';
@@ -67,7 +80,7 @@ export async function createRoom(hostName, opts) {
     response: null,
     createdAt: Date.now(),
   };
-  await dbMod.set(dbMod.ref(db, roomPath(roomId)), room);
+  await dbMod.set(dbMod.ref(db, roomPath(roomId)), stripUndefined(room));
   return roomId;
 }
 
@@ -79,7 +92,7 @@ export async function joinRoom(roomId, guestName) {
   const room = snap.val();
   if (room.status !== 'waiting') throw new Error('이미 시작되었거나 종료된 방입니다.');
   if (room.players.B) throw new Error('이미 정원이 찬 방입니다.');
-  await dbMod.update(dbMod.ref(db, roomPath(roomId, 'players')), { B: guestName });
+  await dbMod.update(dbMod.ref(db, roomPath(roomId, 'players')), stripUndefined({ B: guestName }));
   return room;
 }
 
@@ -105,7 +118,7 @@ export async function markPlaying(roomId) {
 
 export async function pushState(roomId, state) {
   const { db, dbMod } = await loadFirebase();
-  await dbMod.set(dbMod.ref(db, roomPath(roomId, 'state')), state);
+  await dbMod.set(dbMod.ref(db, roomPath(roomId, 'state')), stripUndefined(state));
 }
 
 // 게스트가 request 응답 직전에 최신 state를 한 번 더 확실히 읽을 때 사용
@@ -118,7 +131,7 @@ export async function getRoomState(roomId) {
 
 export async function markDone(roomId, result) {
   const { db, dbMod } = await loadFirebase();
-  await dbMod.update(dbMod.ref(db, roomPath(roomId)), { status: 'done', result });
+  await dbMod.update(dbMod.ref(db, roomPath(roomId)), stripUndefined({ status: 'done', result }));
 }
 
 // 호스트가 중간에 나갈 때 남기는 표시 — 게스트가 room을 계속 구독 중이면 안내를 띄울 수 있다.
@@ -132,7 +145,7 @@ export async function markAbandoned(roomId) {
 // (1) 상표 이동을 애니메이션으로 재현하고 (2) 자기 화면에서도 리플레이를 만들 수 있다.
 export async function pushEvent(roomId, event) {
   const { db, dbMod } = await loadFirebase();
-  await dbMod.push(dbMod.ref(db, roomPath(roomId, 'events')), { ...event, ts: Date.now() });
+  await dbMod.push(dbMod.ref(db, roomPath(roomId, 'events')), stripUndefined({ ...event, ts: Date.now() }));
 }
 
 export async function subscribeEvents(roomId, onEvent) {
@@ -148,7 +161,7 @@ let reqSeq = 0;
 export async function requestFromGuest(roomId, payload) {
   const { db, dbMod } = await loadFirebase();
   const id = `${Date.now()}-${++reqSeq}`;
-  await dbMod.set(dbMod.ref(db, roomPath(roomId, 'request')), { id, ...payload });
+  await dbMod.set(dbMod.ref(db, roomPath(roomId, 'request')), stripUndefined({ id, ...payload }));
   return new Promise((resolve) => {
     const resRef = dbMod.ref(db, roomPath(roomId, 'response'));
     const unsub = dbMod.onValue(resRef, (snap) => {
@@ -177,5 +190,5 @@ export async function subscribeRequest(roomId, onRequest) {
 
 export async function answerRequest(roomId, id, answer) {
   const { db, dbMod } = await loadFirebase();
-  await dbMod.set(dbMod.ref(db, roomPath(roomId, 'response')), { id, answer });
+  await dbMod.set(dbMod.ref(db, roomPath(roomId, 'response')), stripUndefined({ id, answer }));
 }
