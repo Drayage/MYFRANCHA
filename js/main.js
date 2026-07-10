@@ -7,6 +7,7 @@ import { createRecorder, saveReplay, loadReplay, hasReplay, play as playReplay }
 import * as audio from './audio.js';
 import * as online from './online.js';
 import * as persistence from './persistence.js';
+import { move as animateMove } from './animation.js';
 
 const $ = (id) => document.getElementById(id);
 const show = (id) => { $('screen-start').classList.toggle('hidden', id !== 'start'); $('screen-game').classList.toggle('hidden', id !== 'game'); };
@@ -97,6 +98,7 @@ async function runReplay(recording) {
 function goHome() {
   ui.closeModal();
   show('start');
+  activeOnlineRoom = null;
   refreshReplayButton();
   refreshContinueButton();
   refreshOnlineRejoinButton();
@@ -106,6 +108,7 @@ function goHome() {
 // 달리) 이어하기 대상에서 제외한다. (goHome은 게임 종료 후/리플레이 후에도 불리므로 여기서만 지움 —
 // 안 그러면 아직 이어하지 않은 저장된 판을 리플레이만 보고 나가도 지워지는 버그가 생김)
 function abandonGame() {
+  if (activeOnlineRoom?.role === 'host') online.markAbandoned(activeOnlineRoom.roomId).catch(() => {});
   stopWatchingOnline();
   localStorage.removeItem(ONLINE_GUEST_KEY);
   persistence.clearCheckpoint();
@@ -144,6 +147,7 @@ function toggleMute() {
 // 게스트는 별도 엔진 루프 없이, 동기화된 state 스냅샷을 그대로 그리기만 하는 얇은 뷰어 +
 // 자기 차례에 request가 오면 로컬 UI(오프라인과 같은 ui.selectCards 등)로 답을 모아 보낸다.
 let onlineCleanup = null; // 게스트 구독 해제 함수(있을 때만)
+let activeOnlineRoom = null; // { roomId, role: 'host'|'guest' } — 현재 참여 중인 온라인 방(있을 때만)
 
 function stopWatchingOnline() {
   if (onlineCleanup) { onlineCleanup(); onlineCleanup = null; }
@@ -211,6 +215,7 @@ async function hostOnlineGame() {
   const state = createState({ mode: 'online', ...opts });
   state.humanSide = 'A'; // 방장은 항상 갑
   state.roomId = roomId;
+  activeOnlineRoom = { roomId, role: 'host' };
   show('game');
   await online.markPlaying(roomId);
   const trademarks = state.trademarks.map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, ability: t.ability }));
@@ -278,30 +283,61 @@ async function rejoinOnlineGame() {
   await watchOnlineAsGuest(saved.roomId);
 }
 
-// 게스트 구동 루프: state 스냅샷을 그대로 그리기만 하고(움직임 애니메이션은 재현하지 않음 —
-// 온라인 1단계 범위), 자기 차례 request가 오면 오프라인과 같은 ui 선택 함수로 답을 모아 보낸다.
+// 게스트 구동 루프: 보드는 처음 한 번만 그리고(buildBoard), 이후 상표 이동은 이벤트 로그를
+// 구독해 호스트와 같은 애니메이션으로 재현한다(state 스냅샷은 HUD/손패 등 텍스트 갱신에만 사용 —
+// 매번 다시 그리면 진행 중인 애니메이션이 끊기고 위치도 스냅되므로 buildBoard는 최초 1회뿐).
+// 같은 이벤트로 게스트 자신의 리플레이 기록도 만든다(호스트와 동일한 이벤트 스키마 재사용).
 async function watchOnlineAsGuest(roomId) {
   show('game');
   ui.setBanner('⏳ 호스트가 게임을 시작하길 기다리는 중…');
+  activeOnlineRoom = { roomId, role: 'guest' };
   let currentState = null;
+  let boardBuilt = false;
   let gameOverShown = false;
+  let abandonedNoticeShown = false;
+  const subscribedAt = Date.now();
+  const guestRecorder = createRecorder({ mode: 'online' }); // meta는 첫 state 수신 시 채움
 
   const unsubState = await online.subscribeRoom(roomId, (room) => {
     if (!room) {
       ui.showToast('⚠️ 방이 사라졌습니다(호스트가 나갔을 수 있어요).', 3000);
       return;
     }
+    if (room.status === 'abandoned' && !abandonedNoticeShown) {
+      abandonedNoticeShown = true;
+      ui.showToast('🚪 호스트가 게임을 나갔습니다.', 4000);
+    }
     if (room.state) {
       currentState = { ...room.state, humanSide: 'B' }; // 내(게스트) 관점으로 라벨링
-      ui.buildBoard(currentState);
+      if (!guestRecorder.meta.trademarks) {
+        guestRecorder.meta = {
+          mode: 'online', abilitiesEnabled: room.state.abilitiesEnabled,
+          expansionEnabled: room.state.expansionEnabled, theaterEnabled: room.state.theaterEnabled,
+          trademarks: room.state.trademarks.map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, ability: t.ability })),
+        };
+      }
+      if (!boardBuilt) { ui.buildBoard(currentState); boardBuilt = true; }
       ui.updateHUD(currentState);
     }
     if (room.status === 'done' && room.result && !gameOverShown && currentState) {
       gameOverShown = true;
+      saveReplay(guestRecorder, room.result);
+      refreshReplayButton();
       ui.showGameOver(currentState, room.result, {
-        onReplay: () => ui.showToast('온라인 대전은 리플레이를 지원하지 않습니다.'),
+        onReplay: () => runReplay(loadReplay()),
         onHome: () => { stopWatchingOnline(); localStorage.removeItem(ONLINE_GUEST_KEY); goHome(); },
       });
+    }
+  });
+
+  // 이동/무효화/라운드토큰 이벤트: 재접속 시 지난 이벤트도 한꺼번에 오지만(과거분은 이미
+  // state 스냅샷에 반영돼 있으므로) 구독 시작 이후(ts > subscribedAt)의 것만 애니메이션으로 재현.
+  const unsubEvents = await online.subscribeEvents(roomId, async (ev) => {
+    if (!ev) return;
+    guestRecorder.add(ev);
+    if (ev.kind === 'move' && ev.ts > subscribedAt && boardBuilt) {
+      audio.sfx(ev.collision ? 'collision' : 'move');
+      await animateMove(ev.tmId, ev.toOwner, { collision: !!ev.collision });
     }
   });
 
@@ -325,7 +361,7 @@ async function watchOnlineAsGuest(roomId) {
     if (answer) await online.answerRequest(roomId, req.id, answer);
   });
 
-  onlineCleanup = () => { unsubState(); unsubReq(); };
+  onlineCleanup = () => { unsubState(); unsubEvents(); unsubReq(); };
 }
 
 function init() {

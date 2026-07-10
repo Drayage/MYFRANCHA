@@ -121,6 +121,27 @@ export async function markDone(roomId, result) {
   await dbMod.update(dbMod.ref(db, roomPath(roomId)), { status: 'done', result });
 }
 
+// 호스트가 중간에 나갈 때 남기는 표시 — 게스트가 room을 계속 구독 중이면 안내를 띄울 수 있다.
+export async function markAbandoned(roomId) {
+  const { db, dbMod } = await loadFirebase();
+  await dbMod.update(dbMod.ref(db, roomPath(roomId)), { status: 'abandoned' });
+}
+
+// ── 이벤트 로그(이동/무효화/라운드토큰) — 호스트가 append, 게스트가 순서대로 구독 ──
+// engine.js의 recorder.add()와 같은 이벤트를 그대로 흘려보낸다. 게스트는 이걸로
+// (1) 상표 이동을 애니메이션으로 재현하고 (2) 자기 화면에서도 리플레이를 만들 수 있다.
+export async function pushEvent(roomId, event) {
+  const { db, dbMod } = await loadFirebase();
+  await dbMod.push(dbMod.ref(db, roomPath(roomId, 'events')), { ...event, ts: Date.now() });
+}
+
+export async function subscribeEvents(roomId, onEvent) {
+  const { db, dbMod } = await loadFirebase();
+  const eventsRef = dbMod.ref(db, roomPath(roomId, 'events'));
+  const unsub = dbMod.onChildAdded(eventsRef, (snap) => onEvent(snap.val()));
+  return () => unsub();
+}
+
 // ── 호스트→게스트 "네 차례야" 요청/응답 왕복 ──
 // request에 고유 id를 실어 쓰고, response에 같은 id가 오는 순간까지 기다린다.
 let reqSeq = 0;

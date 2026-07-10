@@ -29,6 +29,13 @@ async function sync(state) {
   }
 }
 
+// 리플레이 기록 + (온라인이면) 게스트에게도 같은 이벤트 전송 — 게스트는 이걸로
+// 상표 이동을 애니메이션으로 재현하고, 자기 화면에서도 리플레이를 만들 수 있다.
+function record(state, recorder, ev) {
+  recorder.add(ev);
+  if (state.mode === 'online') online.pushEvent(state.roomId, ev).catch(() => {});
+}
+
 // 게임 1판 실행. recorder에 이벤트를 기록한다.
 // resume: 새로고침 등으로 중단된 판을 이어할 때 넘기는 저장된 state 스냅샷(라운드/세트 경계에서 저장됨).
 // 넘기면 시작 단계(룰 안내·저명상표 주장)를 건너뛰고, 저장된 라운드의 저장된 세트부터 재개한다.
@@ -254,7 +261,7 @@ async function resolveSet(state, submissions, size, recorder) {
 
     const tokGot = evaluateRoundToken(state);
     if (tokGot) {
-      recorder.add({ kind: 'round-token', round: state.round, actor: tokGot });
+      record(state, recorder, { kind: 'round-token', round: state.round, actor: tokGot });
       state.log.push({ kind: 'round-token', actor: tokGot, round: state.round });
       ui.showToast(`🏁 ${PLAYER_LABEL[tokGot]} 라운드 토큰 획득!`, 2200);
       sfx('token');
@@ -300,7 +307,7 @@ async function resolveCard(state, player, slot, slots, idx, recorder) {
       await sleep(400);
       return null;
     }
-    recorder.add({ kind: 'nullify', round: state.round, actor: player, victim: opp });
+    record(state, recorder, { kind: 'nullify', round: state.round, actor: player, victim: opp });
     ui.showToast(`🚫 ${PLAYER_LABEL[player]} 소송뭉개기: ${PLAYER_LABEL[opp]} 같은 턴 무효`, 2000);
     await theater.say(state, { cardType: 'smother', actor: player, victim: opp });
     await sleep(300);
@@ -360,13 +367,14 @@ async function performMove(state, player, card, recorder) {
   const collision = fromOwner === opp; // 상대 상표를 뺏김/리셋 = 충돌 연출
   await theater.say(state, { cardType: card.type, actor: player, victim: opp });
   sfx(collision ? 'collision' : 'move');
-  await move(target.id, toOwner, { collision });
-  applyMove(state, target.id, toOwner);
-
-  recorder.add({
+  // 온라인이면 애니메이션 시작과 거의 동시에 게스트에게도 전송(게스트가 자기 화면에서
+  // 같은 이동을 애니메이션으로 재현할 수 있게 — 상세는 online.js/main.js 참고).
+  record(state, recorder, {
     kind: 'move', round: state.round, setIndex: state.setIndex,
     actor: player, cardType: card.type, tmId: target.id, fromOwner, toOwner, collision,
   });
+  await move(target.id, toOwner, { collision });
+  applyMove(state, target.id, toOwner);
 
   const destLabel = toOwner === OWNER.CENTER ? '중앙' : PLAYER_LABEL[toOwner];
   ui.showToast(`${PLAYER_LABEL[player]} ${card.name}: ${target.name} → ${destLabel}`, 2000);
