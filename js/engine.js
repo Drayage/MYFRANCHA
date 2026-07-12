@@ -22,10 +22,12 @@ const describe = (cards) => cards.map((c) => c.name).join(', ');
 const MOVE_TYPES = ['apply', 'prove', 'cancel'];
 
 // 화면 갱신 + (온라인이면) 게스트에게 현재 상태 스냅샷 전송. 실패해도 게임 진행은 막지 않는다.
+// syncedAt은 호스트 시계 기준 타임스탬프 — 게스트가 이벤트 백로그/실시간을 구분할 때
+// 자기(게스트) 시계와 비교하면 기기 간 시계차로 오판하므로, 항상 호스트 시계끼리만 비교하게 한다.
 async function sync(state) {
   ui.updateHUD(state);
   if (state.mode === 'online') {
-    try { await online.pushState(state.roomId, state); } catch { /* 네트워크 순간 장애 — 다음 sync에서 다시 시도됨 */ }
+    try { await online.pushState(state.roomId, { ...state, syncedAt: Date.now() }); } catch { /* 네트워크 순간 장애 — 다음 sync에서 다시 시도됨 */ }
   }
 }
 

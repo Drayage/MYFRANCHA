@@ -283,10 +283,12 @@ async function rejoinOnlineGame() {
   await watchOnlineAsGuest(saved.roomId);
 }
 
-// 게스트 구동 루프: 보드는 처음 한 번만 그리고(buildBoard), 이후 상표 이동은 이벤트 로그를
-// 구독해 호스트와 같은 애니메이션으로 재현한다(state 스냅샷은 HUD/손패 등 텍스트 갱신에만 사용 —
-// 매번 다시 그리면 진행 중인 애니메이션이 끊기고 위치도 스냅되므로 buildBoard는 최초 1회뿐).
-// 같은 이벤트로 게스트 자신의 리플레이 기록도 만든다(호스트와 동일한 이벤트 스키마 재사용).
+// 게스트 구동 루프: 보드는 처음 한 번만 그리고(buildBoard), 이후 상표 위치는 매 state 스냅샷마다
+// "DOM의 현재 소유자 vs state의 소유자"를 비교해 다른 것만 애니메이션으로 이동시킨다(자가 치유).
+// ⚠️ 이동을 이벤트 타임스탬프(ev.ts, 호스트 시계)와 게스트 시계(Date.now()) 비교로 걸러내면
+// 기기 간 시계차만큼 실시간 이벤트가 전부 "과거"로 오인돼 보드가 영영 안 움직인다(프리즈 증상의
+// 원인이었음). 상태 기준 보정은 시계와 무관하고, 이벤트를 놓쳐도 다음 스냅샷에서 반드시 따라잡는다.
+// 이벤트 로그는 리플레이 기록·충돌 연출 여부 전달·복불복 관전에만 사용한다.
 async function watchOnlineAsGuest(roomId) {
   show('game');
   ui.setBanner('⏳ 호스트가 게임을 시작하길 기다리는 중…');
@@ -295,8 +297,25 @@ async function watchOnlineAsGuest(roomId) {
   let boardBuilt = false;
   let gameOverShown = false;
   let abandonedNoticeShown = false;
-  const subscribedAt = Date.now();
+  let handlingRequest = false; // 내 차례 입력 중엔 배너를 덮어쓰지 않기 위한 플래그
+  let joinHostTime = null;     // 첫 state의 syncedAt(호스트 시계) — 복불복 백로그/실시간 구분용
+  const lastMoveMeta = {};     // tmId → 마지막 move 이벤트(충돌 연출 여부를 보정 애니메이션에 전달)
   const guestRecorder = createRecorder({ mode: 'online' }); // meta는 첫 state 수신 시 채움
+
+  // 상태 기준 보드 보정: state와 다른 위치의 토큰만 이동(animation.move가 DOM을 즉시 옮기고
+  // transform으로 연출하므로, 진행 중인 애니메이션과 겹쳐 불려도 안전·멱등하다).
+  const reconcileBoard = (state) => {
+    for (const tm of state.trademarks) {
+      const el = document.querySelector(`[data-tm="${tm.id}"]`);
+      if (el && el.dataset.owner !== tm.owner) {
+        const meta = lastMoveMeta[tm.id];
+        delete lastMoveMeta[tm.id];
+        const collision = !!(meta && meta.toOwner === tm.owner && meta.collision);
+        audio.sfx(collision ? 'collision' : 'move');
+        animateMove(tm.id, tm.owner, { collision });
+      }
+    }
+  };
 
   const unsubState = await online.subscribeRoom(roomId, (room) => {
     if (!room) {
@@ -309,6 +328,7 @@ async function watchOnlineAsGuest(roomId) {
     }
     if (room.state) {
       currentState = { ...room.state, humanSide: 'B' }; // 내(게스트) 관점으로 라벨링
+      if (joinHostTime == null && room.state.syncedAt) joinHostTime = room.state.syncedAt;
       if (!guestRecorder.meta.trademarks) {
         guestRecorder.meta = {
           mode: 'online', abilitiesEnabled: room.state.abilitiesEnabled,
@@ -320,6 +340,11 @@ async function watchOnlineAsGuest(roomId) {
       ui.updateHUD(currentState);
       // 보호막 배지·저명상표 리본은 state에서 그대로 유도되므로 매 스냅샷마다 다시 맞춘다.
       ui.syncTrademarkMarkers(currentState);
+      reconcileBoard(currentState);
+      // 내 입력을 기다리는 중이 아니면 진행 상황 배너도 따라가게(게스트 화면이 살아있다는 신호).
+      if (!handlingRequest && !document.body.dataset.selecting && currentState.phase !== 'game-over') {
+        ui.setBanner(`라운드 ${currentState.round} · ${['1차', '2차', '3차'][currentState.setIndex] || ''} 진행 중…`);
+      }
     }
     if (room.status === 'done' && room.result && !gameOverShown && currentState) {
       gameOverShown = true;
@@ -332,21 +357,19 @@ async function watchOnlineAsGuest(roomId) {
     }
   });
 
-  // 이동/무효화/라운드토큰 이벤트: 재접속 시 지난 이벤트도 한꺼번에 오지만(과거분은 이미
-  // state 스냅샷에 반영돼 있으므로) 구독 시작 이후(ts > subscribedAt)의 것만 애니메이션으로 재현.
-  // gamble(맹한커피 복불복)은 리플레이 대상이 아니므로 recorder에는 넣지 않고 관전 연출만 한다.
+  // 이벤트 로그: 리플레이 기록(백로그 포함 — 재접속해도 전체 기록 복원) + 충돌 연출 메타 +
+  // 복불복 관전. 복불복 백로그/실시간 구분은 호스트 시계끼리(ev.ts vs joinHostTime) 비교 —
+  // 게스트 시계와 섞어 비교하면 시계차로 오판한다.
   const unsubEvents = await online.subscribeEvents(roomId, async (ev) => {
     if (!ev) return;
-    const isLive = ev.ts > subscribedAt;
     if (ev.kind === 'gamble') {
-      if (isLive) await ui.playCoffeeGambleSpectator(ev.attacker, ev.defender, ev.blocked);
+      if (joinHostTime != null && ev.ts >= joinHostTime) {
+        await ui.playCoffeeGambleSpectator(ev.attacker, ev.defender, ev.blocked);
+      }
       return;
     }
     guestRecorder.add(ev);
-    if (ev.kind === 'move' && isLive && boardBuilt) {
-      audio.sfx(ev.collision ? 'collision' : 'move');
-      await animateMove(ev.tmId, ev.toOwner, { collision: !!ev.collision });
-    }
+    if (ev.kind === 'move') lastMoveMeta[ev.tmId] = ev;
   });
 
   let reqGen = 0; // 이 요청이 아직 "최신"인지 확인하는 세대 번호(아래 프리즈 방지 참고)
@@ -365,28 +388,47 @@ async function watchOnlineAsGuest(roomId) {
     // 이 오래된 요청은 답하지 않는다(중복 응답으로 다음 요청과 꼬이는 것 방지).
     if (myGen !== reqGen) return;
 
-    // 요청 시점 상태를 한 번 더 직접 읽어와 구독 지연으로 인한 손패 불일치를 방지.
-    const fresh = await online.getRoomState(roomId);
-    const state = { ...(fresh || currentState), humanSide: 'B' };
-    let answer = null;
-    if (req.kind === 'cards') {
-      const chosen = await ui.selectCards(state, 'B', req.size, { peekInfo: req.peek });
-      answer = { uids: chosen.map((c) => c.uid) };
-    } else if (req.kind === 'target') {
-      const valid = state.trademarks.filter((t) => req.validIds.includes(t.id));
-      const target = await ui.selectTrademark(valid, `${req.cardName}: 대상 선택`);
-      answer = { tmId: target.id };
-    } else if (req.kind === 'renownedClaim') {
-      const claimed = await ui.selectRenownedClaim(state.trademarks, '상표를 클릭해 능력을 확인한 뒤 "이걸로 선택"을 누르세요');
-      answer = { tmId: claimed.id };
-    } else if (req.kind === 'gamble') {
-      // 맹한커피 복불복: 게스트가 직접 카드를 골라 결과를 정한다(로컬/AI 모드와 같은 UI 재사용).
-      const blocked = await ui.playCoffeeGamble('B', req.defender, true);
-      answer = { blocked };
+    handlingRequest = true;
+    try {
+      // 요청 시점 상태를 한 번 더 직접 읽어와 구독 지연으로 인한 손패 불일치를 방지.
+      const fresh = await online.getRoomState(roomId).catch(() => null);
+      const state = { ...(fresh || currentState), humanSide: 'B' };
+      // Firebase는 빈 배열/객체를 통째로 떨어뜨리므로(hands 등) 방어적으로 채워둔다.
+      state.hands = state.hands || (currentState && currentState.hands) || { A: [], B: [] };
+      state.hands.A = state.hands.A || [];
+      state.hands.B = state.hands.B || [];
+
+      let answer = null;
+      if (req.kind === 'cards') {
+        const chosen = await ui.selectCards(state, 'B', req.size, { peekInfo: req.peek });
+        answer = { uids: chosen.map((c) => c.uid) };
+      } else if (req.kind === 'target') {
+        const valid = state.trademarks.filter((t) => req.validIds.includes(t.id));
+        const target = await ui.selectTrademark(valid, `${req.cardName}: 대상 선택`);
+        answer = { tmId: target.id };
+      } else if (req.kind === 'renownedClaim') {
+        const claimed = await ui.selectRenownedClaim(state.trademarks, '상표를 클릭해 능력을 확인한 뒤 "이걸로 선택"을 누르세요');
+        answer = { tmId: claimed.id };
+      } else if (req.kind === 'gamble') {
+        // 맹한커피 복불복: 게스트가 직접 카드를 골라 결과를 정한다(로컬/AI 모드와 같은 UI 재사용).
+        const blocked = await ui.playCoffeeGamble('B', req.defender, true);
+        answer = { blocked };
+      }
+      // 프리즈 방지 2: 내가 답하는 사이 더 최신 요청이 이미 와 있었다면(호스트 재요청 등)
+      // 이 답은 이제 의미가 없으므로 보내지 않는다 — 호스트가 기다리는 건 최신 요청의 답뿐.
+      if (answer && myGen === reqGen) {
+        try {
+          await online.answerRequest(roomId, req.id, answer);
+        } catch {
+          await online.answerRequest(roomId, req.id, answer); // 일시적 네트워크 오류 — 1회 재시도
+        }
+      }
+    } catch (e) {
+      // 여기서 조용히 죽으면 호스트가 영원히 기다린다 — 최소한 화면에 문제를 드러낸다.
+      ui.showToast('⚠️ 입력 처리 중 오류가 발생했습니다. 네트워크 확인 후 새로고침 해주세요.', 4500);
+    } finally {
+      handlingRequest = false;
     }
-    // 프리즈 방지 2: 내가 답하는 사이 더 최신 요청이 이미 와 있었다면(호스트 재요청 등)
-    // 이 답은 이제 의미가 없으므로 보내지 않는다 — 호스트가 기다리는 건 최신 요청의 답뿐.
-    if (answer && myGen === reqGen) await online.answerRequest(roomId, req.id, answer);
   });
 
   onlineCleanup = () => { unsubState(); unsubEvents(); unsubReq(); };
