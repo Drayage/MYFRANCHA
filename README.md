@@ -117,6 +117,12 @@ python3 -m http.server 8000
   "🌐 온라인 방 재접속" 버튼으로 같은 방에 다시 들어갑니다(재접속 시 지난 이동은 이미
   최신 상태 스냅샷에 반영되어 있으므로 다시 애니메이션하지 않고, 그 시점 이후 이동만 재생).
 
+`state`(onValue)와 `request`(onValue)는 서로 다른 경로라 도착 순서가 보장되지 않는다 —
+특히 재접속 직후 이미 대기 중인 request가 아직 안 그려진 보드보다 먼저 오면 대상 선택 UI가
+엘리먼트를 못 찾아 Promise가 영원히 안 풀리고 게스트 화면이 멈출 수 있었다. 게스트의 request
+핸들러는 이제 보드가 준비될 때까지 대기하고, "세대 번호"로 자신보다 최신 요청이 이미 왔으면
+그 요청엔 답하지 않는다(호스트 새로고침 후 재요청 등으로 request가 덮어써지는 경우 대비).
+
 `js/online.js`는 `createRoom` / `joinRoom` / `subscribeRoom` / `requestFromGuest` /
 `subscribeRequest` / `answerRequest` / `pushState` / `pushEvent` / `subscribeEvents` /
 `markAbandoned` 등을 제공합니다.

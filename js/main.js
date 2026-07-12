@@ -349,8 +349,22 @@ async function watchOnlineAsGuest(roomId) {
     }
   });
 
+  let reqGen = 0; // 이 요청이 아직 "최신"인지 확인하는 세대 번호(아래 프리즈 방지 참고)
   const unsubReq = await online.subscribeRequest(roomId, async (req) => {
     if (req.player !== 'B') return;
+    const myGen = ++reqGen;
+
+    // 프리즈 방지 1: state 구독(subscribeRoom)과 request 구독은 서로 다른 Firebase 경로라
+    // 도착 순서가 보장되지 않는다 — 재접속 직후 request가 state보다 먼저 오면 보드가 아직
+    // 없는 채로 selectTrademark/selectRenownedClaim이 대상 엘리먼트를 못 찾아 리스너를 하나도
+    // 못 붙이고, 그러면 Promise가 영원히 안 풀려서 화면이 멈춘다. 보드가 준비될 때까지 대기.
+    let waited = 0;
+    while (!boardBuilt && waited < 8000) { await new Promise((r) => setTimeout(r, 100)); waited += 100; }
+    if (!boardBuilt) { ui.showToast('⚠️ 연결이 불안정합니다. 새로고침 후 다시 시도해주세요.', 4000); return; }
+    // 그 사이 호스트가 재요청(예: 호스트 새로고침 후 재개)해서 더 최신 request가 왔으면
+    // 이 오래된 요청은 답하지 않는다(중복 응답으로 다음 요청과 꼬이는 것 방지).
+    if (myGen !== reqGen) return;
+
     // 요청 시점 상태를 한 번 더 직접 읽어와 구독 지연으로 인한 손패 불일치를 방지.
     const fresh = await online.getRoomState(roomId);
     const state = { ...(fresh || currentState), humanSide: 'B' };
@@ -370,7 +384,9 @@ async function watchOnlineAsGuest(roomId) {
       const blocked = await ui.playCoffeeGamble('B', req.defender, true);
       answer = { blocked };
     }
-    if (answer) await online.answerRequest(roomId, req.id, answer);
+    // 프리즈 방지 2: 내가 답하는 사이 더 최신 요청이 이미 와 있었다면(호스트 재요청 등)
+    // 이 답은 이제 의미가 없으므로 보내지 않는다 — 호스트가 기다리는 건 최신 요청의 답뿐.
+    if (answer && myGen === reqGen) await online.answerRequest(roomId, req.id, answer);
   });
 
   onlineCleanup = () => { unsubState(); unsubEvents(); unsubReq(); };

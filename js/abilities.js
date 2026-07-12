@@ -59,25 +59,28 @@ export function checkPigShieldBlocked(state, targetTm) {
   return { blocked: true, tmId: targetTm.id, text: '🛡️ 화남돼지집 보호막: 대상 지정 차단!' };
 }
 
-// 유효 타겟 수정: 저명상표 주장(1R 1차 한정) + 도발(강제) + 남스터치(강탈 업글)
+// 유효 타겟 수정: 저명상표 주장(1R 1차 한정) + 남스터치(강탈 업글) + 도발(강제, 최우선)
 export function modifyTargets(state, actor, card, valid) {
   // 저명상표 주장: 라운드1 1차에서만, 을이 지정한 상표는 갑이 출원으로 가져올 수 없다.
   if (state.renownedClaim && state.round === 1 && state.setIndex === 0 &&
       card.type === 'apply' && actor === 'A') {
     valid = valid.filter((t) => t.id !== state.renownedClaim);
   }
-  // 도발: 상대가 도발 토큰을 자기 영역에 보유 & 이 카드가 상대 공격이면 그 토큰만 대상
+  // 남스터치: 출원을 쓸 때 상대 영역 상표도 대상(강탈)으로 먼저 넓혀둔다 —
+  // 도발이 이 확장된 대상 중에서도 우선권을 가져야 하므로 도발 체크보다 앞에 와야 한다.
+  if (card.type === 'apply' && holderOf(state, 'moms') === actor) {
+    const stolen = state.trademarks.filter((t) => t.owner === opp(actor));
+    valid = valid.concat(stolen);
+  }
+  // 도발: 상대가 도발 토큰을 자기 영역에 보유하고 있고, 이 카드가 그 토큰을 대상으로 삼을 수
+  // 있다면(사실관계증명/불사용취소심판은 물론, 남스터치로 강화된 출원도 포함) 그 토큰만 대상으로
+  // 강제한다 — 남스터치 강탈도 도발을 무시하고 다른 상표를 먼저 노릴 수 없다.
   const tauntHolder = holderOf(state, 'taunt');
-  if (tauntHolder && tauntHolder === opp(actor) && (card.type === 'prove' || card.type === 'cancel')) {
+  if (tauntHolder && tauntHolder === opp(actor)) {
     const tauntTm = state.trademarks.find((t) => t.ability === 'taunt');
     if (tauntTm && tauntTm.owner === opp(actor) && valid.some((t) => t.id === tauntTm.id)) {
       return valid.filter((t) => t.id === tauntTm.id);
     }
-  }
-  // 남스터치: 출원을 쓸 때 상대 영역 상표도 대상(강탈)
-  if (card.type === 'apply' && holderOf(state, 'moms') === actor) {
-    const stolen = state.trademarks.filter((t) => t.owner === opp(actor));
-    return valid.concat(stolen);
   }
   return valid;
 }
