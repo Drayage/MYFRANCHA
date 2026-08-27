@@ -220,7 +220,16 @@ async function hostOnlineGame() {
   await online.markPlaying(roomId);
   const trademarks = state.trademarks.map((t) => ({ id: t.id, name: t.name, emoji: t.emoji, ability: t.ability }));
   const recorder = createRecorder({ mode: 'online', ...opts, trademarks });
-  await playOut(state, recorder, null);
+  try {
+    await playOut(state, recorder, null);
+  } catch (e) {
+    // 게스트 응답 타임아웃(online.requestFromGuest) 등으로 게임 루프가 끊긴 경우 —
+    // 화면이 멈춘 채로 남지 않도록 방을 정리하고 로비로 복귀시킨다.
+    online.markAbandoned(roomId).catch(() => {});
+    activeOnlineRoom = null;
+    goHome();
+    infoModal('연결 끊김', e?.message || '상대와의 연결이 끊어졌습니다.');
+  }
 }
 
 // 게스트가 들어올 때까지 방 코드를 보여주며 대기(room 구독으로 실시간 반영).

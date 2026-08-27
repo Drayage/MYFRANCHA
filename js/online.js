@@ -157,22 +157,37 @@ export async function subscribeEvents(roomId, onEvent) {
 
 // ── 호스트→게스트 "네 차례야" 요청/응답 왕복 ──
 // request에 고유 id를 실어 쓰고, response에 같은 id가 오는 순간까지 기다린다.
+// 게스트가 응답 없이 끊기면(탭 종료, 네트워크 단절 등) 이 Promise가 영원히 안 풀려
+// 호스트 화면이 그대로 멈춰버리므로, 90초 타임아웃으로 reject해 상위(main.js의
+// hostOnlineGame)가 잡아 로비로 복귀시킬 수 있게 한다.
+const GUEST_REQUEST_TIMEOUT_MS = 90000;
 let reqSeq = 0;
 export async function requestFromGuest(roomId, payload) {
   const { db, dbMod } = await loadFirebase();
   const id = `${Date.now()}-${++reqSeq}`;
   await dbMod.set(dbMod.ref(db, roomPath(roomId, 'request')), stripUndefined({ id, ...payload }));
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const resRef = dbMod.ref(db, roomPath(roomId, 'response'));
+    let settled = false;
     const unsub = dbMod.onValue(resRef, (snap) => {
       const val = snap.val();
       if (val && val.id === id) {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
         unsub();
         dbMod.remove(dbMod.ref(db, roomPath(roomId, 'request')));
         dbMod.remove(resRef);
         resolve(val.answer);
       }
     });
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      unsub();
+      dbMod.remove(dbMod.ref(db, roomPath(roomId, 'request'))).catch(() => {});
+      reject(new Error('상대(게스트) 응답이 90초 동안 없습니다 — 연결이 끊어진 것 같습니다.'));
+    }, GUEST_REQUEST_TIMEOUT_MS);
   });
 }
 
